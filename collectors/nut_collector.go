@@ -40,7 +40,7 @@ func NewNutCollector(opts NutCollectorOpts) (*NutCollector, error) {
 		prometheus.GaugeOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
-			Name:      "device",
+			Name:      "device_info",
 			Help:      "UPS device information",
 			},
 			append([]string{"ups"}, deviceLabels...),
