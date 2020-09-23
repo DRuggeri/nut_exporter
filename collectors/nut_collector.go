@@ -1,124 +1,52 @@
 package collectors
 
 import (
-	"time"
-	"strings"
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
 	"github.com/robbiet480/go.nut"
+	"strings"
 )
 
-var deviceLabels = []string{ "model", "mfr", "serial", "type", "description", "contact", "location", "part", "macaddr", "uptime" }
+var deviceLabels = []string{"model", "mfr", "serial", "type", "description", "contact", "location", "part", "macaddr", "uptime"}
 
 type NutCollector struct {
-	deviceMetric *prometheus.GaugeVec
-	varsMetric *prometheus.GaugeVec
-	opts	NutCollectorOpts
-
-	scrapesTotalMetric              prometheus.Counter
-	scrapeErrorsTotalMetric         prometheus.Counter
-	lastScrapeErrorMetric           prometheus.Gauge
-	lastScrapeTimestampMetric       prometheus.Gauge
-	lastScrapeDurationSecondsMetric prometheus.Gauge
+	deviceDesc *prometheus.Desc
+	varsDesc   *prometheus.Desc
+	opts       NutCollectorOpts
 }
 
 type NutCollectorOpts struct {
-	Namespace       string
-	Server	string
-	Ups	string
-	Username	string
-	Password	string
-	Variables	[]string
+	Namespace string
+	Server    string
+	Ups       string
+	Username  string
+	Password  string
+	Variables []string
 }
 
 func NewNutCollector(opts NutCollectorOpts) (*NutCollector, error) {
 	namespace := opts.Namespace
 	subsystem := "ups"
 
-	deviceMetric := prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "device_info",
-			Help:      "UPS device information",
-			},
-			append([]string{"ups"}, deviceLabels...),
-		)
-
-	varsMetric := prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "variable",
-			Help:      "Variable from Network UPS Tools",
-			},
-			[]string{"ups", "variable"},
-		)
-
-	scrapesTotalMetric := prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "scrapes_total",
-			Help:      "Total number of scrapes for network UPS tools variables",
-		},
+	deviceDesc := prometheus.NewDesc(prometheus.BuildFQName(namespace, subsystem, "device_info"),
+		"UPS Device information",
+		append([]string{"ups"}, deviceLabels...), nil,
 	)
 
-	scrapeErrorsTotalMetric := prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "scrape_errors_total",
-			Help:      "Total number of scrapes errors for Network UPS Tools variables",
-		},
-	)
-
-	lastScrapeErrorMetric := prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "last_scrape_error",
-			Help:      "Whether the last scrape of Network UPS Tools variables resulted in an error (1 for error, 0 for success)",
-		},
-	)
-
-	lastScrapeTimestampMetric := prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "last_scrape_timestamp",
-			Help:      "Number of seconds since 1970 since last scrape of Network UPS Tools variables",
-		},
-	)
-
-	lastScrapeDurationSecondsMetric := prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "last_scrape_duration_seconds",
-			Help:      "Duration of the last scrape of Network UPS Tools variables",
-		},
+	varsDesc := prometheus.NewDesc(prometheus.BuildFQName(namespace, subsystem, "variable"),
+		"Variable from Network UPS Tools",
+		[]string{"ups", "variable"}, nil,
 	)
 
 	return &NutCollector{
-		deviceMetric: deviceMetric,
-		varsMetric: varsMetric,
-		opts: opts,
-
-		scrapesTotalMetric:              scrapesTotalMetric,
-		scrapeErrorsTotalMetric:         scrapeErrorsTotalMetric,
-		lastScrapeErrorMetric:           lastScrapeErrorMetric,
-		lastScrapeTimestampMetric:       lastScrapeTimestampMetric,
-		lastScrapeDurationSecondsMetric: lastScrapeDurationSecondsMetric,
+		deviceDesc: deviceDesc,
+		varsDesc:   varsDesc,
+		opts:       opts,
 	}, nil
 }
 
 func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
-	var begun = time.Now()
-
-	errorMetric := float64(0)
-
 	client, err := nut.Connect(c.opts.Server)
 	if err == nil {
 		log.Debugf("Connected to server `%v`", c.opts.Server)
@@ -130,12 +58,10 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 		}
 	}
 
-        if err != nil {
+	if err != nil {
 		log.Error(err)
-		c.scrapeErrorsTotalMetric.Inc()
-		errorMetric = float64(1)
 	} else {
-		var upsList []nut.UPS
+		upsList := []nut.UPS{}
 		if c.opts.Ups != "" {
 			ups, err := nut.NewUPS(c.opts.Ups, &client)
 			if err == nil {
@@ -154,8 +80,6 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 			}
 		}
 
-
-
 		for _, ups := range upsList {
 			device := make(map[string]string)
 			for _, label := range deviceLabels {
@@ -167,15 +91,15 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 			log.Debugf("  Description: %v", ups.Description)
 			log.Debugf("  Master: %v", ups.Master)
 			log.Debugf("  NumberOfLogins: %v", ups.NumberOfLogins)
-			log.Debug ("  Clients:")
+			log.Debug("  Clients:")
 			for i, clientName := range ups.Clients {
 				log.Debugf("    %v: %v", i, clientName)
 			}
-			log.Debug ("  Commands:")
+			log.Debug("  Commands:")
 			for _, command := range ups.Commands {
 				log.Debugf("    %v: %v", command.Name, command.Description)
 			}
-			log.Debug ("  Variables:")
+			log.Debug("  Variables:")
 			for _, variable := range ups.Variables {
 				log.Debugf("    %v:", variable.Name)
 				log.Debugf("      Value: '%v'", variable.Value)
@@ -224,7 +148,7 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 						continue
 					}
 
-					c.varsMetric.WithLabelValues(ups.Name, variable.Name).Set(value)
+					ch <- prometheus.MustNewConstMetric(c.varsDesc, prometheus.GaugeValue, value, ups.Name, variable.Name)
 				} else {
 					log.Debugf("      Export the variable? false")
 				}
@@ -234,36 +158,15 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 			for _, label := range deviceLabels {
 				deviceValues = append(deviceValues, device[label])
 			}
-			c.deviceMetric.WithLabelValues(deviceValues...).Set(1)
+			ch <- prometheus.MustNewConstMetric(c.deviceDesc, prometheus.GaugeValue, float64(1), deviceValues...)
 		}
 		client.Disconnect()
 	}
-	c.deviceMetric.Collect(ch)
-	c.varsMetric.Collect(ch)
-
-	c.scrapeErrorsTotalMetric.Collect(ch)
-
-	c.scrapesTotalMetric.Inc()
-	c.scrapesTotalMetric.Collect(ch)
-
-	c.lastScrapeErrorMetric.Set(errorMetric)
-	c.lastScrapeErrorMetric.Collect(ch)
-
-	c.lastScrapeTimestampMetric.Set(float64(time.Now().Unix()))
-	c.lastScrapeTimestampMetric.Collect(ch)
-
-	c.lastScrapeDurationSecondsMetric.Set(time.Since(begun).Seconds())
-	c.lastScrapeDurationSecondsMetric.Collect(ch)
 }
 
 func (c *NutCollector) Describe(ch chan<- *prometheus.Desc) {
-	c.deviceMetric.Describe(ch)
-	c.varsMetric.Describe(ch)
-	c.scrapesTotalMetric.Describe(ch)
-	c.scrapeErrorsTotalMetric.Describe(ch)
-	c.lastScrapeErrorMetric.Describe(ch)
-	c.lastScrapeTimestampMetric.Describe(ch)
-	c.lastScrapeDurationSecondsMetric.Describe(ch)
+	ch <- c.deviceDesc
+	ch <- c.varsDesc
 }
 
 func sliceContains(c []string, value string) bool {

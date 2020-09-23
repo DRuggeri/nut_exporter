@@ -13,7 +13,6 @@ import (
 	"gopkg.in/alecthomas/kingpin.v2"
 
 	"github.com/DRuggeri/nut_exporter/collectors"
-
 )
 
 var (
@@ -108,7 +107,7 @@ func main() {
 
 	if *nutUsername != "" {
 		log.Infoln("Authenticating to NUT server")
-	        nutPassword = os.Getenv("NUT_EXPORTER_PASSWORD")
+		nutPassword = os.Getenv("NUT_EXPORTER_PASSWORD")
 		if nutPassword == "" {
 			log.Error("Username set, but NUT_EXPORTER_PASSWORD environment variable missing. Cannot authenticate!")
 			os.Exit(2)
@@ -121,12 +120,12 @@ func main() {
 		variables = append(variables, strings.Trim(varName, " "))
 	}
 
-	collectorOpts := collectors.NutCollectorOpts {
+	collectorOpts := collectors.NutCollectorOpts{
 		Namespace: *metricsNamespace,
-		Server: *server,
-		Ups: *ups,
-		Username: *nutUsername,
-		Password: nutPassword,
+		Server:    *server,
+		Ups:       *ups,
+		Username:  *nutUsername,
+		Password:  nutPassword,
 		Variables: variables,
 	}
 
