@@ -8,6 +8,7 @@ The variables exposed to a NUT client by the NUT system are the lifeblood of a d
  * See the [NUT documentation](https://networkupstools.org/docs/user-manual.chunked/apcs01.html) for a list of all possible variables
  * Default configs usually permit reading variables without authentication. If you have disabled this, see the Usage below to set credentials
  * This exporter will always export the device.* metrics as labels with a constant value of 1
+ * Setting the `nut.vars_enable` parameter to an empty string will cause all numeric variables to be exported
  * Not all driver and UPS implementations provide all variables. Run this exporter with log.level at debug or use the `LIST VAR` upsc command to see available variables for your UPS
  * All number-like values are coaxed to the appropriate go type by the library and are set as the value of the exported metric
  * Boolean values are coaxed to 0 (false) or 1 (true)
