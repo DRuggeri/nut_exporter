@@ -12,7 +12,6 @@ var deviceLabels = []string{"model", "mfr", "serial", "type", "description", "co
 
 type NutCollector struct {
 	deviceDesc *prometheus.Desc
-	varsDesc   *prometheus.Desc
 	opts       NutCollectorOpts
 }
 
@@ -26,22 +25,13 @@ type NutCollectorOpts struct {
 }
 
 func NewNutCollector(opts NutCollectorOpts) (*NutCollector, error) {
-	namespace := opts.Namespace
-	subsystem := "ups"
-
-	deviceDesc := prometheus.NewDesc(prometheus.BuildFQName(namespace, subsystem, "device_info"),
+	deviceDesc := prometheus.NewDesc(prometheus.BuildFQName(opts.Namespace, "ups", "device_info"),
 		"UPS Device information",
 		append([]string{"ups"}, deviceLabels...), nil,
 	)
 
-	varsDesc := prometheus.NewDesc(prometheus.BuildFQName(namespace, subsystem, "variable"),
-		"Variable from Network UPS Tools",
-		[]string{"ups", "variable"}, nil,
-	)
-
 	return &NutCollector{
 		deviceDesc: deviceDesc,
-		varsDesc:   varsDesc,
 		opts:       opts,
 	}, nil
 }
@@ -80,10 +70,17 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 			}
 		}
 
+		if err != nil {
+			ch <- prometheus.NewInvalidMetric(
+				prometheus.NewDesc(prometheus.BuildFQName(c.opts.Namespace, "ups", "error"),
+					"Failure gathering UPS variables", nil, nil),
+				err)
+		}
+
 		for _, ups := range upsList {
 			device := make(map[string]string)
 			for _, label := range deviceLabels {
-				device[label] = "unset"
+				device[label] = ""
 			}
 
 			log.Debugf("UPS info:")
@@ -148,7 +145,12 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 						continue
 					}
 
-					ch <- prometheus.MustNewConstMetric(c.varsDesc, prometheus.GaugeValue, value, ups.Name, variable.Name)
+					varDesc := prometheus.NewDesc(prometheus.BuildFQName(c.opts.Namespace, "ups", strings.Replace(variable.Name, ".", "_", -1)),
+						fmt.Sprintf("Value of the %s variable from Network UPS Tools", variable.Name),
+						[]string{"ups"}, nil,
+					)
+
+					ch <- prometheus.MustNewConstMetric(varDesc, prometheus.GaugeValue, value, ups.Name)
 				} else {
 					log.Debugf("      Export the variable? false")
 				}
@@ -166,7 +168,6 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 
 func (c *NutCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.deviceDesc
-	ch <- c.varsDesc
 }
 
 func sliceContains(c []string, value string) bool {
