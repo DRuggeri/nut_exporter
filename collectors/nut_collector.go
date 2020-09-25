@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-var deviceLabels = []string{"model", "mfr", "serial", "type", "description", "contact", "location", "part", "macaddr", "uptime"}
+var deviceLabels = []string{"model", "mfr", "serial", "type", "description", "contact", "location", "part", "macaddr"}
 
 type NutCollector struct {
 	deviceDesc *prometheus.Desc
