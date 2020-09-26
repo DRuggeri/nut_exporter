@@ -25,7 +25,7 @@ type NutCollectorOpts struct {
 }
 
 func NewNutCollector(opts NutCollectorOpts) (*NutCollector, error) {
-	deviceDesc := prometheus.NewDesc(prometheus.BuildFQName(opts.Namespace, "ups", "device_info"),
+	deviceDesc := prometheus.NewDesc(prometheus.BuildFQName(opts.Namespace, "", "device_info"),
 		"UPS Device information",
 		append([]string{"ups"}, deviceLabels...), nil,
 	)
@@ -72,7 +72,7 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 
 		if err != nil {
 			ch <- prometheus.NewInvalidMetric(
-				prometheus.NewDesc(prometheus.BuildFQName(c.opts.Namespace, "ups", "error"),
+				prometheus.NewDesc(prometheus.BuildFQName(c.opts.Namespace, "", "error"),
 					"Failure gathering UPS variables", nil, nil),
 				err)
 		}
@@ -145,7 +145,7 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 						continue
 					}
 
-					varDesc := prometheus.NewDesc(prometheus.BuildFQName(c.opts.Namespace, "ups", strings.Replace(variable.Name, ".", "_", -1)),
+					varDesc := prometheus.NewDesc(prometheus.BuildFQName(c.opts.Namespace, "", strings.Replace(variable.Name, ".", "_", -1)),
 						fmt.Sprintf("Value of the %s variable from Network UPS Tools", variable.Name),
 						[]string{"ups"}, nil,
 					)

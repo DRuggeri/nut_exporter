@@ -20,10 +20,6 @@ var (
 		"nut.server", "Hostname or IP address of the server to connect to.' ($NUT_EXPORTER_SERVER)",
 	).Envar("NUT_EXPORTER_SERVER").Default("127.0.0.1").String()
 
-	ups = kingpin.Flag(
-		"nut.ups", "Optional name of UPS to monitor. If not set, all UPSs found will be monitored on each scrape' ($NUT_EXPORTER_UPS)",
-	).Envar("NUT_EXPORTER_UPS").String()
-
 	nutUsername = kingpin.Flag(
 		"nut.username", "If set, will authenticate with this username to the server. Password must be set in NUT_EXPORTER_PASSWORD environment variable.' ($NUT_EXPORTER_USERNAME)",
 	).Envar("NUT_EXPORTER_SERVER").String()
@@ -45,6 +41,11 @@ var (
 		"web.telemetry-path", "Path under which to expose Prometheus metrics ($NUT_EXPORTER_WEB_TELEMETRY_PATH)",
 	).Envar("NUT_EXPORTER_WEB_TELEMETRY_PATH").Default("/metrics").String()
 
+	exporterMetricsPath = kingpin.Flag(
+		"web.exporter-telemetry-path", "Path under which to expose process metrics about this exporter ($NUT_EXPORTER_WEB_EXPORTER_TELEMETRY_PATH)",
+	).Envar("NUT_EXPORTER_WEB_EXPORTER_TELEMETRY_PATH").Default("/exporter_metrics").String()
+
+
 	authUsername = kingpin.Flag(
 		"web.auth.username", "Username for web interface basic auth ($NUT_EXPORTER_WEB_AUTH_USERNAME)",
 	).Envar("NUT_EXPORTER_WEB_AUTH_USERNAME").String()
@@ -62,6 +63,7 @@ var (
 		"printMetrics", "Print the metrics this exporter exposes and exits. Default: false ($NUT_EXPORTER_PRINT_METRICS)",
 	).Envar("NUT_EXPORTER_PRINT_METRICS").Default("false").Bool()
 )
+var collectorOpts collectors.NutCollectorOpts
 
 func init() {
 	prometheus.MustRegister(version.NewCollector(*metricsNamespace))
@@ -71,6 +73,9 @@ type basicAuthHandler struct {
 	handler  http.HandlerFunc
 	username string
 	password string
+}
+
+type metricsHandler struct {
 }
 
 func (h *basicAuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -85,18 +90,42 @@ func (h *basicAuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-func prometheusHandler() http.Handler {
-	handler := promhttp.Handler()
+func (h *metricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	thisCollectorOpts := collectors.NutCollectorOpts{
+                Namespace: collectorOpts.Namespace,
+                Server:    collectorOpts.Server,
+                Username:  collectorOpts.Username,
+                Password:  collectorOpts.Password,
+                Variables: collectorOpts.Variables,
+		Ups:       r.URL.Query().Get("ups"),
+        }
 
+	nutCollector, err := collectors.NewNutCollector(thisCollectorOpts)
+        if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("500 - InternalServer Error"))
+                log.Error(err)
+		return
+        }
+	registry := prometheus.NewRegistry()
+	registry.MustRegister(nutCollector)
+
+	newHandler := promhttp.HandlerFor(registry, promhttp.HandlerOpts{})
+	newHandler = promhttp.InstrumentMetricHandler(registry, newHandler)
+	newHandler.ServeHTTP(w,r)
+	return
+}
+
+func basicAuthHandlerBuilder(parentHandler http.Handler) http.Handler {
 	if *authUsername != "" && authPassword != "" {
-		handler = &basicAuthHandler{
-			handler:  promhttp.Handler().ServeHTTP,
+		return &basicAuthHandler{
+			handler:  parentHandler.ServeHTTP,
 			username: *authUsername,
 			password: authPassword,
 		}
 	}
 
-	return handler
+	return parentHandler
 }
 
 func main() {
@@ -120,10 +149,9 @@ func main() {
 		variables = append(variables, strings.Trim(varName, " "))
 	}
 
-	collectorOpts := collectors.NutCollectorOpts{
+	collectorOpts = collectors.NutCollectorOpts{
 		Namespace: *metricsNamespace,
 		Server:    *server,
-		Ups:       *ups,
 		Username:  *nutUsername,
 		Password:  nutPassword,
 		Variables: variables,
@@ -161,16 +189,9 @@ func main() {
 	log.Infoln("Starting nut_exporter", version.Info())
 	log.Infoln("Build context", version.BuildContext())
 
-	nutCollector, err := collectors.NewNutCollector(collectorOpts)
-	if err != nil {
-		log.Error(err)
-		os.Exit(1)
-	}
-	prometheus.MustRegister(nutCollector)
-
 	authPassword = os.Getenv("NUT_EXPORTER_WEB_AUTH_PASSWORD")
-	handler := prometheusHandler()
-	http.Handle(*metricsPath, handler)
+	http.Handle(*metricsPath, basicAuthHandlerBuilder(&metricsHandler{}))
+	http.Handle(*exporterMetricsPath, basicAuthHandlerBuilder(promhttp.Handler()))
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`<html>
              <head><title>NUT Exporter</title></head>

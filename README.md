@@ -6,6 +6,8 @@ A [Prometheus](https://prometheus.io) exporter for the Network UPS Tools server.
 The variables exposed to a NUT client by the NUT system are the lifeblood of a deployment. These variables are consumed by this exporter and coaxed to Prometheus types.
 
  * See the [NUT documentation](https://networkupstools.org/docs/user-manual.chunked/apcs01.html) for a list of all possible variables
+ * Variables are set as prometheus metrics with the `ups` name added as a lable. Example: `ups.load` is set as `network_ups_tools_ups_load{ups="foo"} 100`
+ * The exporter should be used with the ups to scrape set in the query string. Example: `https://127.0.0.1:9199/metrics?ups=foo`
  * Default configs usually permit reading variables without authentication. If you have disabled this, see the Usage below to set credentials
  * This exporter will always export the device.* metrics as labels with a constant value of 1
  * Setting the `nut.vars_enable` parameter to an empty string will cause all numeric variables to be exported
@@ -48,14 +50,13 @@ usage: nut_exporter [<flags>]
 Flags:
   -h, --help                    Show context-sensitive help (also try --help-long and --help-man).
       --nut.server="127.0.0.1"  Hostname or IP address of the server to connect to.' ($NUT_EXPORTER_SERVER)
-      --nut.ups=NUT.UPS         Optional name of UPS to monitor. If not set, all UPSs found will be monitored on each scrape' ($NUT_EXPORTER_UPS)
       --nut.username=NUT.USERNAME
                                 If set, will authenticate with this username to the server. Password must be set in NUT_EXPORTER_PASSWORD environment variable.' ($NUT_EXPORTER_USERNAME)
       --nut.vars_enable="battery.charge,battery.voltage,battery.voltage.nominal,input.voltage,input.voltage.nominal,ups.load"
                                 A comma-separated list of variable names to monitor. See the variable notes in README.' ($NUT_EXPORTER_VARIABLES)
       --metrics.namespace="network_ups_tools"
                                 Metrics Namespace ($NUT_EXPORTER_METRICS_NAMESPACE)
-      --web.listen-address=":9198"
+      --web.listen-address=":9199"
                                 Address to listen on for web interface and telemetry ($NUT_EXPORTER_WEB_LISTEN_ADDRESS)
       --web.telemetry-path="/metrics"
                                 Path under which to expose Prometheus metrics ($NUT_EXPORTER_WEB_TELEMETRY_PATH)
@@ -79,12 +80,6 @@ Flags:
 This collector is the workhorse of the exporter. Default metrics are exported for the device and scrape stats. The `network_ups_tools_ups_variable` metric is exported with labels of `ups` and `variable` with the value set as noted in the README
 
 ```
-NUT
-  network_ups_tools_ups_device - UPS device information
-  network_ups_tools_ups_variable - Variable from Network UPS Tools
-  network_ups_tools_ups_scrapes_total - Total number of scrapes for network UPS tools variables
-  network_ups_tools_ups_scrape_errors_total - Total number of scrapes errors for Network UPS Tools variables
-  network_ups_tools_ups_last_scrape_error - Whether the last scrape of Network UPS Tools variables resulted in an error (1 for error, 0 for success)
-  network_ups_tools_ups_last_scrape_timestamp - Number of seconds since 1970 since last scrape of Network UPS Tools variables
-  network_ups_tools_ups_last_scrape_duration_seconds - Duration of the last scrape of Network UPS Tools variables
+  network_ups_tools_device_info - UPS device information
+  network_ups_tools_VARIABLE_NAME - Variable from Network UPS Tools as noted in the variable notes above
 ```
