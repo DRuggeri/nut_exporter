@@ -27,7 +27,7 @@ type NutCollectorOpts struct {
 func NewNutCollector(opts NutCollectorOpts) (*NutCollector, error) {
 	deviceDesc := prometheus.NewDesc(prometheus.BuildFQName(opts.Namespace, "", "device_info"),
 		"UPS Device information",
-		append([]string{"ups"}, deviceLabels...), nil,
+		deviceLabels, nil,
 	)
 
 	return &NutCollector{
@@ -74,6 +74,17 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 			ch <- prometheus.NewInvalidMetric(
 				prometheus.NewDesc(prometheus.BuildFQName(c.opts.Namespace, "", "error"),
 					"Failure gathering UPS variables", nil, nil),
+				err)
+		}
+
+		if len(upsList) > 1 {
+			log.Errorf("Multiple UPS devices were found by NUT for this scrap. For this configuration, you MUST scrape this exporter with a query string parameter indicating which UPS to scrape. Valid values of ups are:")
+			for _, ups := range upsList {
+				log.Errorf("  %s", ups.Name)
+			}
+			ch <- prometheus.NewInvalidMetric(
+				prometheus.NewDesc(prometheus.BuildFQName(c.opts.Namespace, "", "error"),
+					"Multiple UPS devices were found fron NUT. Please add a ups=<name> query string", nil, nil),
 				err)
 		}
 
@@ -147,16 +158,16 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 
 					varDesc := prometheus.NewDesc(prometheus.BuildFQName(c.opts.Namespace, "", strings.Replace(variable.Name, ".", "_", -1)),
 						fmt.Sprintf("Value of the %s variable from Network UPS Tools", variable.Name),
-						[]string{"ups"}, nil,
+						nil, nil,
 					)
 
-					ch <- prometheus.MustNewConstMetric(varDesc, prometheus.GaugeValue, value, ups.Name)
+					ch <- prometheus.MustNewConstMetric(varDesc, prometheus.GaugeValue, value)
 				} else {
 					log.Debugf("      Export the variable? false")
 				}
 			}
 
-			deviceValues := []string{ups.Name}
+			deviceValues := []string{}
 			for _, label := range deviceLabels {
 				deviceValues = append(deviceValues, device[label])
 			}

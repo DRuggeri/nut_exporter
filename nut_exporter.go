@@ -38,12 +38,12 @@ var (
 	).Envar("NUT_EXPORTER_WEB_LISTEN_ADDRESS").Default(":9199").String()
 
 	metricsPath = kingpin.Flag(
-		"web.telemetry-path", "Path under which to expose Prometheus metrics ($NUT_EXPORTER_WEB_TELEMETRY_PATH)",
-	).Envar("NUT_EXPORTER_WEB_TELEMETRY_PATH").Default("/metrics").String()
+		"web.telemetry-path", "Path under which to expose the UPS Prometheus metrics ($NUT_EXPORTER_WEB_TELEMETRY_PATH)",
+	).Envar("NUT_EXPORTER_WEB_TELEMETRY_PATH").Default("/ups_metrics").String()
 
 	exporterMetricsPath = kingpin.Flag(
 		"web.exporter-telemetry-path", "Path under which to expose process metrics about this exporter ($NUT_EXPORTER_WEB_EXPORTER_TELEMETRY_PATH)",
-	).Envar("NUT_EXPORTER_WEB_EXPORTER_TELEMETRY_PATH").Default("/exporter_metrics").String()
+	).Envar("NUT_EXPORTER_WEB_EXPORTER_TELEMETRY_PATH").Default("/metrics").String()
 
 
 	authUsername = kingpin.Flag(
@@ -197,7 +197,8 @@ func main() {
              <head><title>NUT Exporter</title></head>
              <body>
              <h1>NUT Exporter</h1>
-             <p><a href='` + *metricsPath + `'>Metrics</a></p>
+             <p><a href='` + *metricsPath + `'>UPS metrics</a></p>
+             <p><a href='` + *exporterMetricsPath + `'>Exporter metrics</a></p>
              </body>
              </html>`))
 	})
