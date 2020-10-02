@@ -146,6 +146,10 @@ func main() {
 	variables := []string{}
 	for _, varName := range strings.Split(*enableFilter, ",") {
 		// Be nice and clear spaces for those that like them
+		variable := strings.Trim(varName, " ")
+		if "" == variable {
+			continue
+		}
 		variables = append(variables, strings.Trim(varName, " "))
 	}
 

@@ -163,7 +163,7 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 
 					ch <- prometheus.MustNewConstMetric(varDesc, prometheus.GaugeValue, value)
 				} else {
-					log.Debugf("      Export the variable? false")
+					log.Debugf("      Export the variable? false (%v) (%v)", len(c.opts.Variables), c.opts.Variables)
 				}
 			}
 
