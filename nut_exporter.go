@@ -45,7 +45,6 @@ var (
 		"web.exporter-telemetry-path", "Path under which to expose process metrics about this exporter ($NUT_EXPORTER_WEB_EXPORTER_TELEMETRY_PATH)",
 	).Envar("NUT_EXPORTER_WEB_EXPORTER_TELEMETRY_PATH").Default("/metrics").String()
 
-
 	authUsername = kingpin.Flag(
 		"web.auth.username", "Username for web interface basic auth ($NUT_EXPORTER_WEB_AUTH_USERNAME)",
 	).Envar("NUT_EXPORTER_WEB_AUTH_USERNAME").String()
@@ -92,27 +91,27 @@ func (h *basicAuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (h *metricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	thisCollectorOpts := collectors.NutCollectorOpts{
-                Namespace: collectorOpts.Namespace,
-                Server:    collectorOpts.Server,
-                Username:  collectorOpts.Username,
-                Password:  collectorOpts.Password,
-                Variables: collectorOpts.Variables,
+		Namespace: collectorOpts.Namespace,
+		Server:    collectorOpts.Server,
+		Username:  collectorOpts.Username,
+		Password:  collectorOpts.Password,
+		Variables: collectorOpts.Variables,
 		Ups:       r.URL.Query().Get("ups"),
-        }
+	}
 
 	nutCollector, err := collectors.NewNutCollector(thisCollectorOpts)
-        if err != nil {
+	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("500 - InternalServer Error"))
-                log.Error(err)
+		log.Error(err)
 		return
-        }
+	}
 	registry := prometheus.NewRegistry()
 	registry.MustRegister(nutCollector)
 
 	newHandler := promhttp.HandlerFor(registry, promhttp.HandlerOpts{})
 	newHandler = promhttp.InstrumentMetricHandler(registry, newHandler)
-	newHandler.ServeHTTP(w,r)
+	newHandler.ServeHTTP(w, r)
 	return
 }
 
