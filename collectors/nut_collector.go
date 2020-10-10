@@ -152,7 +152,7 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 					case float64:
 						value = float64(v)
 					default:
-						log.Warnf("Variable `%s` is of unknown type `%s`")
+						log.Warnf("Variable from nut client library `%s` is of unknown type `%T` (value=`%v`)", variable.Name, v, v)
 						continue
 					}
 
