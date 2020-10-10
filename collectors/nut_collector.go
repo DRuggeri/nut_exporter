@@ -129,7 +129,7 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 
 					/* All numbers are coaxed to native types by the library, so at this point we know
 					   we cannot set this value because a string will never be a float-like number */
-					if variable.Type == "STRING" {
+					if strings.ToLower(variable.Type) == "string" {
 						continue
 					}
 
@@ -151,8 +151,12 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 						value = float64(v)
 					case float64:
 						value = float64(v)
+					case string:
+						/* Nothing we can do here. Bug in nut client library
+						   listing UNKNOWN or NUMBER instead of STRING? */
+						continue
 					default:
-						log.Warnf("Variable from nut client library `%s` is of unknown type `%T` (value=`%v`)", variable.Name, v, v)
+						log.Warnf("Variable from nut client library `%s` is of unknown type `%T` (claimed=`%v` value=`%v`)", variable.Name, v, variable.Type, v)
 						continue
 					}
 
