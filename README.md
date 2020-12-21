@@ -15,6 +15,11 @@ The variables exposed to a NUT client by the NUT system are the lifeblood of a d
  * Not all driver and UPS implementations provide all variables. Run this exporter with log.level at debug or use the `LIST VAR` upsc command to see available variables for your UPS
  * All number-like values are coaxed to the appropriate go type by the library and are set as the value of the exported metric
  * Boolean values are coaxed to 0 (false) or 1 (true)
+ * The special `ups.status` variable is returned by NUT as a string. It is coaxed to an integer by this exporter to enable use of alerting on status changes. The values are:
+   * `OL`: Online - `0`
+   * `OB`: On Battery - `1`
+   * `LB`: Low Battery - `2`
+   * Any other value: Unknown - `3`
 
 ### Example Scrape Configuration
 Note that this exporter will scrape only one UPS per scrape invocation. If there are multiple UPS devices visible to NUT, you MUST ensure that you set up different scrape configs for each UPS device. Here is an example configuration for such a use case:

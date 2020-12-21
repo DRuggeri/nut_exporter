@@ -127,6 +127,21 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 					log.Debugf("      Export the variable? true")
 					value := float64(0)
 
+					/* Manually coax critical vaules to floats */
+					if variable.Name == "ups.status" {
+						variable.Type = "INTEGER"
+						switch {
+						case variable.Value == "OL":
+							variable.Value = float64(0)
+						case variable.Value == "OB":
+							variable.Value = float64(1)
+						case variable.Value == "LB":
+							variable.Value = float64(2)
+						default:
+							variable.Value = float64(3)
+						}
+					}
+
 					/* All numbers are coaxed to native types by the library, so at this point we know
 					   we cannot set this value because a string will never be a float-like number */
 					if strings.ToLower(variable.Type) == "string" {
