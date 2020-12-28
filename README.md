@@ -1,6 +1,6 @@
 # Network UPS Tools (NUT) Prometheus Exporter
 
-A [Prometheus](https://prometheus.io) exporter for the Network UPS Tools server. This exporter utilizes the [go.nut](https://github.com/robbiet480/go.nut) project as a network client of the NUT platform. The exporter is written in a way to permit an administrator to scrape one or many UPS devices visible to a NUT client as well as one or all NUT variables.
+A [Prometheus](https://prometheus.io) exporter for the Network UPS Tools server. This exporter utilizes the [go.nut](https://github.com/robbiet480/go.nut) project as a network client of the NUT platform. The exporter is written in a way to permit an administrator to scrape one or many UPS devices visible to a NUT client as well as one or all NUT variables. A single instance of this exporter can scrape one or many NUT servers as well.
 
 ## Variables and information
 The variables exposed to a NUT client by the NUT system are the lifeblood of a deployment. These variables are consumed by this exporter and coaxed to Prometheus types.
@@ -15,13 +15,38 @@ The variables exposed to a NUT client by the NUT system are the lifeblood of a d
  * Not all driver and UPS implementations provide all variables. Run this exporter with log.level at debug or use the `LIST VAR` upsc command to see available variables for your UPS
  * All number-like values are coaxed to the appropriate go type by the library and are set as the value of the exported metric
  * Boolean values are coaxed to 0 (false) or 1 (true)
- * The special `ups.status` variable is returned by NUT as a string. It is coaxed to an integer by this exporter to enable use of alerting on status changes. The values are:
-   * `OL`: Online - `0`
-   * `OB`: On Battery - `1`
-   * `LB`: Low Battery - `2`
-   * Any other value: Unknown - `3`
+ * The special `ups.status` variable is returned by NUT as a string. It is coaxed to an integer by this exporter to enable use of alerting on status changes.
+   * Values are gleaned from the [NUT driver documentation](https://github.com/networkupstools/nut/blob/master/docs/new-drivers.txt)
+   * NOTE: Not all UPSs utilize all values! It depends greatly on the driver and the intelligence of the UPS. A general failsafe is to alert when the value is greater than either `0` or `1`
+   * The values are:
+     * OL - `0` - On line (mains is present)
+     * OB - `1` - On battery (mains is not present)
+     * LB - `2` - Low battery
+     * HB - `3` - High battery
+     * RB - `4` - The battery needs to be replaced
+     * CHRG - `5` - The battery is charging
+     * DISCHRG - `6` - The battery is discharging (inverter is providing load power)
+     * BYPASS - `7` -  UPS bypass circuit is active -- no battery protection is available
+     * CAL - `8` - UPS is currently performing runtime calibration (on battery)
+     * OFF - `9` - UPS is offline and is not supplying power to the load
+     * OVER - `10` - UPS is overloaded
+     * TRIM - `11` - UPS is trimming incoming voltage (called "buck" in some hardware)
+     * BOOST - `12` - UPS is boosting incoming voltage
+     * FSD and SD - `13` - Forced Shutdown
+     * Any other value - 100 - Unknown
 
-### Example Scrape Configuration
+### Query String Parameters
+The exporter allows for per-scrape overrides of command line parameters by passing query string parameters. This enables a single nut_exporter to scrape multiple NUT servers
+
+The following query string parameters can be passed to the `/ups_metrics` path:
+  * `ups` - Required if more than one UPS is present in NUT)
+  * `server` - Overrides the command line parameter `--nut.server`
+  * `username` - Overrides the command line parameter `--nut.username`
+  * `password` - Overrides the environment variable NUT_EXPORTER_PASSWORD. It is **strongly** recommended to avoid passing credentials over http unless the exporter is configured with TLS
+  * `variables` - Overrides the command line parameter `--nut.vars_enable`
+See the example scrape configurations below for how to utilize this capability
+
+### Example Scrape Configurations
 Note that this exporter will scrape only one UPS per scrape invocation. If there are multiple UPS devices visible to NUT, you MUST ensure that you set up different scrape configs for each UPS device. Here is an example configuration for such a use case:
 
 ```
@@ -32,7 +57,7 @@ Note that this exporter will scrape only one UPS per scrape invocation. If there
         labels:
           ups:  "primary"
     params:
-      ups: [ "primray" ]
+      ups: [ "primary" ]
   - job_name: nut-secondary
     metrics_path: /ups_metrics
     static_configs:
@@ -41,6 +66,28 @@ Note that this exporter will scrape only one UPS per scrape invocation. If there
           ups:  "secondary"
     params:
       ups: [ "secondary" ]
+```
+
+You can also configure a single exporter to scrape several NUT servers like so:
+```
+  - job_name: nut-primary
+    metrics_path: /ups_metrics
+    static_configs:
+      - targets: ['exporterserver:9199']
+        labels:
+          ups:  "primary"
+    params:
+      ups: [ "primary" ]
+      server: [ "nutserver1" ]
+  - job_name: nut-secondary
+    metrics_path: /ups_metrics
+    static_configs:
+      - targets: ['exporterserver:9199']
+        labels:
+          ups:  "secondary"
+    params:
+      ups: [ "secondary" ]
+      server: [ "nutserver2" ]
 ```
 
 

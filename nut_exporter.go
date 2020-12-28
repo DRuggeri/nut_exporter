@@ -99,6 +99,22 @@ func (h *metricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Ups:       r.URL.Query().Get("ups"),
 	}
 
+	if r.URL.Query().Get("server") != "" {
+		thisCollectorOpts.Server = r.URL.Query().Get("server")
+	}
+
+	if r.URL.Query().Get("username") != "" {
+		thisCollectorOpts.Username = r.URL.Query().Get("username")
+	}
+
+	if r.URL.Query().Get("password") != "" {
+		thisCollectorOpts.Password = r.URL.Query().Get("password")
+	}
+
+	if r.URL.Query().Get("variables") != "" {
+		thisCollectorOpts.Variables = strings.Split(r.URL.Query().Get("variables"), ",")
+	}
+
 	nutCollector, err := collectors.NewNutCollector(thisCollectorOpts)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
