@@ -31,7 +31,9 @@ network_ups_tools_ups_status{flag="TRIM"} 1
 network_ups_tools_ups_status{flag="CHRG"} 1
 ```
 
-Therefore, alerting can be configured for specific statuses. For example, to alert if the UPS has gone on battery, you would set the alerting rule as `network_ups_tools_ups_status{flag="OB"} == 1`
+Therefore, alerting can be configured for specific statuses. Examples:
+ * **Alert if the UPS has exited 'online' mode**: `absent(`network_ups_tools_ups_status{flag="OL"}) == 1`
+ * **Alert if the UPS has gone on battery**:  `network_ups_tools_ups_status{flag="OB"} == 1`
 
 Unfortunately, the NUT documentation does not call out the full list of statuses each driver implements nor what a user can expect for a status.
 The following values were detected in the [NUT driver documentation](https://github.com/networkupstools/nut/blob/master/docs/new-drivers.txt):
