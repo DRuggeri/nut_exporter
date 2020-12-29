@@ -127,43 +127,17 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 					log.Debugf("      Export the variable? true")
 					value := float64(0)
 
-					/* Manually coax critical vaules to floats */
+					/* Deal with ups.status specially because it is a collection of 'flags' */
 					if variable.Name == "ups.status" {
-						variable.Type = "INTEGER"
-						switch {
-						case variable.Value == "OL":
-							variable.Value = float64(0)
-						case variable.Value == "OB":
-							variable.Value = float64(1)
-						case variable.Value == "LB":
-							variable.Value = float64(2)
-						case variable.Value == "HB":
-							variable.Value = float64(3)
-						case variable.Value == "RB":
-							variable.Value = float64(4)
-						case variable.Value == "CHRG":
-							variable.Value = float64(5)
-						case variable.Value == "DISCHRG":
-							variable.Value = float64(6)
-						case variable.Value == "BYPASS":
-							variable.Value = float64(7)
-						case variable.Value == "CAL":
-							variable.Value = float64(8)
-						case variable.Value == "OFF":
-							variable.Value = float64(9)
-						case variable.Value == "OVER":
-							variable.Value = float64(10)
-						case variable.Value == "TRIM":
-							variable.Value = float64(11)
-						case variable.Value == "BOOST":
-							variable.Value = float64(12)
-						case variable.Value == "FSD":
-							variable.Value = float64(13)
-						case variable.Value == "SD": /* I've seen docs for SD and FSD... not sure which is accurate?! */
-							variable.Value = float64(13)
-						default:
-							variable.Value = float64(100)
+						varDesc := prometheus.NewDesc(prometheus.BuildFQName(c.opts.Namespace, "", strings.Replace(variable.Name, ".", "_", -1)),
+							fmt.Sprintf("Value of the %s variable from Network UPS Tools", variable.Name),
+							[]string{"flag"}, nil,
+						)
+
+						for _, statusFlag := range strings.Split(variable.Value.(string), " ") {
+							ch <- prometheus.MustNewConstMetric(varDesc, prometheus.GaugeValue, float64(1), statusFlag)
 						}
+						continue
 					}
 
 					/* All numbers are coaxed to native types by the library, so at this point we know

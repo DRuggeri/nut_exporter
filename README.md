@@ -15,25 +15,43 @@ The variables exposed to a NUT client by the NUT system are the lifeblood of a d
  * Not all driver and UPS implementations provide all variables. Run this exporter with log.level at debug or use the `LIST VAR` upsc command to see available variables for your UPS
  * All number-like values are coaxed to the appropriate go type by the library and are set as the value of the exported metric
  * Boolean values are coaxed to 0 (false) or 1 (true)
- * The special `ups.status` variable is returned by NUT as a string. It is coaxed to an integer by this exporter to enable use of alerting on status changes.
-   * Values are gleaned from the [NUT driver documentation](https://github.com/networkupstools/nut/blob/master/docs/new-drivers.txt)
-   * NOTE: Not all UPSs utilize all values! It depends greatly on the driver and the intelligence of the UPS. A general failsafe is to alert when the value is greater than either `0` or `1`
-   * The values are:
-     * OL - `0` - On line (mains is present)
-     * OB - `1` - On battery (mains is not present)
-     * LB - `2` - Low battery
-     * HB - `3` - High battery
-     * RB - `4` - The battery needs to be replaced
-     * CHRG - `5` - The battery is charging
-     * DISCHRG - `6` - The battery is discharging (inverter is providing load power)
-     * BYPASS - `7` -  UPS bypass circuit is active -- no battery protection is available
-     * CAL - `8` - UPS is currently performing runtime calibration (on battery)
-     * OFF - `9` - UPS is offline and is not supplying power to the load
-     * OVER - `10` - UPS is overloaded
-     * TRIM - `11` - UPS is trimming incoming voltage (called "buck" in some hardware)
-     * BOOST - `12` - UPS is boosting incoming voltage
-     * FSD and SD - `13` - Forced Shutdown
-     * Any other value - 100 - Unknown
+
+### ups.status handling
+The special `ups.status` variable is returned by NUT as a string containing a list of status flags.
+There may be one or more flags set depending on the driver in use and the current state of the UPS.
+For example, `OL TRIM CHRG` indicates the UPS is online, stepping down incoming voltage and charging the battery.
+
+The metric `network_ups_tools_ups_status` will be set with a label for each flag returned with a constant value of `1`
+
+**Example**
+The above example will coax `OL TRIM CHRG` to...
+```
+network_ups_tools_ups_status{flag="OL"} 1
+network_ups_tools_ups_status{flag="TRIM"} 1
+network_ups_tools_ups_status{flag="CHRG"} 1
+```
+
+Therefore, alerting can be configured for specific statuses. For example, to alert if the UPS has gone on battery, you would set the alerting rule as `network_ups_tools_ups_status{flag="OB"} == 1`
+
+Unfortunately, the NUT documentation does not call out the full list of statuses each driver implements nor what a user can expect for a status.
+The following values were detected in the [NUT driver documentation](https://github.com/networkupstools/nut/blob/master/docs/new-drivers.txt):
+ * OL - On line (mains is present)
+ * OB - On battery (mains is not present)
+ * LB - Low battery
+ * HB - High battery
+ * RB - The battery needs to be replaced
+ * CHRG - The battery is charging
+ * DISCHRG - The battery is discharging (inverter is providing load power)
+ * BYPASS - UPS bypass circuit is active -- no battery protection is available
+ * CAL - UPS is currently performing runtime calibration (on battery)
+ * OFF - UPS is offline and is not supplying power to the load
+ * OVER - UPS is overloaded
+ * TRIM - UPS is trimming incoming voltage (called "buck" in some hardware)
+ * BOOST - UPS is boosting incoming voltage
+ * FSD and SD - Forced Shutdown
+
+**IMPORTANT NOTE:** Not all UPSs utilize all values! It depends greatly on the driver and the intelligence of the UPS.
+It is strongly suggested to observe your UPS under both "normal" and "abnormal" conditions to know what to expect NUT will report.
 
 ### Query String Parameters
 The exporter allows for per-scrape overrides of command line parameters by passing query string parameters. This enables a single nut_exporter to scrape multiple NUT servers
@@ -88,6 +106,21 @@ You can also configure a single exporter to scrape several NUT servers like so:
     params:
       ups: [ "secondary" ]
       server: [ "nutserver2" ]
+```
+
+Or use a more robust relabel config similar to the [snmp_exporter](https://github.com/prometheus/snmp_exporter) (thanks to @sshaikh for the example):
+```
+  - job_name: ups
+    static_configs:
+      - targets: ['server1','server2'] # nut exporter
+    metrics_path: /ups_metrics
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_server
+      - source_labels: [__param_server]
+        target_label: instance
+      - target_label: __address__
+        replacement: nut-exporter.local:9199
 ```
 
 
