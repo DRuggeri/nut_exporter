@@ -31,7 +31,8 @@ network_ups_tools_ups_status{flag="TRIM"} 1
 network_ups_tools_ups_status{flag="CHRG"} 1
 ```
 
-Therefore, alerting can be configured for specific statuses. Examples:
+#### Alerting on ups.status
+As noted above, the UPS status is a special case and is handled with flags set as labels on the `network_ups_tools_ups_status` metric. Therefore, alerting can be configured for specific statuses. Examples:
  * **Alert if the UPS has exited 'online' mode**: `absent(`network_ups_tools_ups_status{flag="OL"}) == 1`
  * **Alert if the UPS has gone on battery**:  `network_ups_tools_ups_status{flag="OB"} == 1`
 
@@ -125,6 +126,7 @@ Or use a more robust relabel config similar to the [snmp_exporter](https://githu
         replacement: nut-exporter.local:9199
 ```
 
+&nbsp;
 
 ## Installation
 
@@ -150,6 +152,8 @@ $ nut_exporter <flags>
 docker build -t nut_exporter .
 docker run -d -p 9199:9199 nut_exporter"
 ```
+
+&nbsp;
 
 ## Usage
 
@@ -186,6 +190,8 @@ Flags:
                                 Set the log target and format. Example: "logger:syslog?appname=bob&local=7" or "logger:stdout?json=true"
       --version                 Show application version.
 ```
+
+&nbsp;
 
 ## Metrics
 
