@@ -22,6 +22,7 @@ type NutCollectorOpts struct {
 	Username  string
 	Password  string
 	Variables []string
+	Statuses  []string
 }
 
 func NewNutCollector(opts NutCollectorOpts) (*NutCollector, error) {
@@ -129,13 +130,26 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 
 					/* Deal with ups.status specially because it is a collection of 'flags' */
 					if variable.Name == "ups.status" {
+						setStatuses := make(map[string]bool)
 						varDesc := prometheus.NewDesc(prometheus.BuildFQName(c.opts.Namespace, "", strings.Replace(variable.Name, ".", "_", -1)),
 							fmt.Sprintf("Value of the %s variable from Network UPS Tools", variable.Name),
 							[]string{"flag"}, nil,
 						)
 
 						for _, statusFlag := range strings.Split(variable.Value.(string), " ") {
+							setStatuses[statusFlag] = true
 							ch <- prometheus.MustNewConstMetric(varDesc, prometheus.GaugeValue, float64(1), statusFlag)
+						}
+
+						/* If the user specifies the statues that must always be set, handle that here */
+						if len(c.opts.Statuses) > 0 {
+							for _, status := range c.opts.Statuses {
+								/* This status flag was set because we saw it in the output... skip it */
+								if _, ok := setStatuses[status]; ok {
+									continue
+								}
+								ch <- prometheus.MustNewConstMetric(varDesc, prometheus.GaugeValue, float64(0), status)
+							}
 						}
 						continue
 					}

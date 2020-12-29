@@ -29,6 +29,10 @@ var (
 		"nut.vars_enable", "A comma-separated list of variable names to monitor. See the variable notes in README.' ($NUT_EXPORTER_VARIABLES)",
 	).Envar("NUT_EXPORTER_VARIABLES").Default("battery.charge,battery.voltage,battery.voltage.nominal,input.voltage,input.voltage.nominal,ups.load,ups.status").String()
 
+	statusList = kingpin.Flag(
+		"nut.statuses", "A comma-separated list of statuses labels that will always be set by the exporter. If NUT does not set these flags, the exporter will force the network_ups_tools_ups_status{flag=\"NAME\"} to 0. See the ups.status notes in README.' ($NUT_EXPORTER_STATUSES)",
+	).Envar("NUT_EXPORTER_STATUSES").Default("OL,OB,LB,HB,RB,CHRG,DISCHRG,BYPASS,CAL,OFF,OVER,TRIM,BOOST,FSD,SD").String()
+
 	metricsNamespace = kingpin.Flag(
 		"metrics.namespace", "Metrics Namespace ($NUT_EXPORTER_METRICS_NAMESPACE)",
 	).Envar("NUT_EXPORTER_METRICS_NAMESPACE").Default("network_ups_tools").String()
@@ -96,6 +100,7 @@ func (h *metricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Username:  collectorOpts.Username,
 		Password:  collectorOpts.Password,
 		Variables: collectorOpts.Variables,
+		Statuses:  collectorOpts.Statuses,
 		Ups:       r.URL.Query().Get("ups"),
 	}
 
@@ -113,6 +118,10 @@ func (h *metricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if r.URL.Query().Get("variables") != "" {
 		thisCollectorOpts.Variables = strings.Split(r.URL.Query().Get("variables"), ",")
+	}
+
+	if r.URL.Query().Get("statuses") != "" {
+		thisCollectorOpts.Statuses = strings.Split(r.URL.Query().Get("statuses"), ",")
 	}
 
 	nutCollector, err := collectors.NewNutCollector(thisCollectorOpts)
@@ -168,12 +177,23 @@ func main() {
 		variables = append(variables, strings.Trim(varName, " "))
 	}
 
+	statuses := []string{}
+	for _, status := range strings.Split(*statusList, ",") {
+		// Be nice and clear spaces for those that like them
+		stat := strings.Trim(status, " ")
+		if "" == stat {
+			continue
+		}
+		statuses = append(statuses, strings.Trim(stat, " "))
+	}
+
 	collectorOpts = collectors.NutCollectorOpts{
 		Namespace: *metricsNamespace,
 		Server:    *server,
 		Username:  *nutUsername,
 		Password:  nutPassword,
 		Variables: variables,
+		Statuses:  statuses,
 	}
 
 	if *printMetrics {

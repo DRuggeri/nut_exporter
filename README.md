@@ -31,10 +31,39 @@ network_ups_tools_ups_status{flag="TRIM"} 1
 network_ups_tools_ups_status{flag="CHRG"} 1
 ```
 
+The exporter supports the `--nut.statuses` flag to allow you to force certain statuses to be exported at all times, regardless of whether NUT reports the status.
+This defaults to the below known list of statuses.
+
+**Example**
+Without changing the defaults, the status of `OL TRIM CHRG` will cause the following labels and values to be exported:
+```
+network_ups_tools_ups_status{flag="OL"} 1
+network_ups_tools_ups_status{flag="TRIM"} 1
+network_ups_tools_ups_status{flag="CHRG"} 1
+network_ups_tools_ups_status{flag="OB"} 0
+network_ups_tools_ups_status{flag="LB"} 0
+network_ups_tools_ups_status{flag="HB"} 0
+network_ups_tools_ups_status{flag="RB"} 0
+network_ups_tools_ups_status{flag="DISCHRG"} 0
+network_ups_tools_ups_status{flag="BYPASS"} 0
+network_ups_tools_ups_status{flag="CAL"} 0
+network_ups_tools_ups_status{flag="OFF"} 0
+network_ups_tools_ups_status{flag="OVER"} 0
+network_ups_tools_ups_status{flag="BOOST"} 0
+network_ups_tools_ups_status{flag="FSD"} 0
+network_ups_tools_ups_status{flag="FD"} 0
+```
+Because each UPS differs, it is advisable to observe your UPS under various conditions to know which of these statuses will never apply.
+
+
 #### Alerting on ups.status
+**IMPORTANT NOTE:** Not all UPSs utilize all values! What is reported by NUT depends greatly on the driver and the intelligence of the UPS.
+It is strongly suggested to observe your UPS under both "normal" and "abnormal" conditions to know what to expect NUT will report.
+
 As noted above, the UPS status is a special case and is handled with flags set as labels on the `network_ups_tools_ups_status` metric. Therefore, alerting can be configured for specific statuses. Examples:
- * **Alert if the UPS has exited 'online' mode**: `absent(`network_ups_tools_ups_status{flag="OL"}) == 1`
+ * **Alert if the UPS has exited 'online' mode**: `network_ups_tools_ups_status{flag="OL"} == 0`
  * **Alert if the UPS has gone on battery**:  `network_ups_tools_ups_status{flag="OB"} == 1`
+ * **Alert if any status changed in the past 5 minutes** changes(network_ups_tools_ups_status[5m])
 
 Unfortunately, the NUT documentation does not call out the full list of statuses each driver implements nor what a user can expect for a status.
 The following values were detected in the [NUT driver documentation](https://github.com/networkupstools/nut/blob/master/docs/new-drivers.txt):
@@ -52,9 +81,7 @@ The following values were detected in the [NUT driver documentation](https://git
  * TRIM - UPS is trimming incoming voltage (called "buck" in some hardware)
  * BOOST - UPS is boosting incoming voltage
  * FSD and SD - Forced Shutdown
-
-**IMPORTANT NOTE:** Not all UPSs utilize all values! It depends greatly on the driver and the intelligence of the UPS.
-It is strongly suggested to observe your UPS under both "normal" and "abnormal" conditions to know what to expect NUT will report.
+Therefore, these are all enabled in the default value for `--nut.statuses`. 
 
 ### Query String Parameters
 The exporter allows for per-scrape overrides of command line parameters by passing query string parameters. This enables a single nut_exporter to scrape multiple NUT servers
@@ -65,6 +92,7 @@ The following query string parameters can be passed to the `/ups_metrics` path:
   * `username` - Overrides the command line parameter `--nut.username`
   * `password` - Overrides the environment variable NUT_EXPORTER_PASSWORD. It is **strongly** recommended to avoid passing credentials over http unless the exporter is configured with TLS
   * `variables` - Overrides the command line parameter `--nut.vars_enable`
+  * `statuses` - Overrides the command line parameter `--nut.statuses`
 See the example scrape configurations below for how to utilize this capability
 
 ### Example Scrape Configurations
@@ -167,8 +195,11 @@ Flags:
       --nut.server="127.0.0.1"  Hostname or IP address of the server to connect to.' ($NUT_EXPORTER_SERVER)
       --nut.username=NUT.USERNAME
                                 If set, will authenticate with this username to the server. Password must be set in NUT_EXPORTER_PASSWORD environment variable.' ($NUT_EXPORTER_USERNAME)
-      --nut.vars_enable="battery.charge,battery.voltage,battery.voltage.nominal,input.voltage,input.voltage.nominal,ups.load"
+      --nut.vars_enable="battery.charge,battery.voltage,battery.voltage.nominal,input.voltage,input.voltage.nominal,ups.load,ups.status"
                                 A comma-separated list of variable names to monitor. See the variable notes in README.' ($NUT_EXPORTER_VARIABLES)
+      --nut.statuses="OL,OB,LB,HB,RB,CHRG,DISCHRG,BYPASS,CAL,OFF,OVER,TRIM,BOOST,FSD,SD"
+                                A comma-separated list of statuses labels that will always be set by the exporter. If NUT does not set these flags, the exporter will force the network_ups_tools_ups_status{flag="NAME"} to 0. See the
+                                ups.status notes in README.' ($NUT_EXPORTER_STATUSES)
       --metrics.namespace="network_ups_tools"
                                 Metrics Namespace ($NUT_EXPORTER_METRICS_NAMESPACE)
       --web.listen-address=":9199"
