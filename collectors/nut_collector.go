@@ -132,7 +132,7 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 					if variable.Name == "ups.status" {
 						setStatuses := make(map[string]bool)
 						varDesc := prometheus.NewDesc(prometheus.BuildFQName(c.opts.Namespace, "", strings.Replace(variable.Name, ".", "_", -1)),
-							fmt.Sprintf("Value of the %s variable from Network UPS Tools", variable.Name),
+							fmt.Sprintf("%s (%s)", variable.Description, variable.Name),
 							[]string{"flag"}, nil,
 						)
 
@@ -188,7 +188,7 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 					}
 
 					varDesc := prometheus.NewDesc(prometheus.BuildFQName(c.opts.Namespace, "", strings.Replace(variable.Name, ".", "_", -1)),
-						fmt.Sprintf("Value of the %s variable from Network UPS Tools", variable.Name),
+						fmt.Sprintf("%s (%s)", variable.Description, variable.Name),
 						nil, nil,
 					)
 
