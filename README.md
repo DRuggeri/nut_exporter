@@ -103,28 +103,23 @@ Note that this exporter will scrape only one UPS per scrape invocation. If there
     metrics_path: /ups_metrics
     static_configs:
       - targets: ['myserver:9199']
-        labels:
-          ups:  "primary"
     params:
       ups: [ "primary" ]
   - job_name: nut-secondary
     metrics_path: /ups_metrics
     static_configs:
       - targets: ['myserver:9199']
-        labels:
-          ups:  "secondary"
     params:
       ups: [ "secondary" ]
 ```
 
-You can also configure a single exporter to scrape several NUT servers like so:
+You can also configure a single exporter to scrape several NUT servers. The server is added as a metric label.
+
 ```
   - job_name: nut-primary
     metrics_path: /ups_metrics
     static_configs:
       - targets: ['exporterserver:9199']
-        labels:
-          ups:  "primary"
     params:
       ups: [ "primary" ]
       server: [ "nutserver1" ]
@@ -132,8 +127,6 @@ You can also configure a single exporter to scrape several NUT servers like so:
     metrics_path: /ups_metrics
     static_configs:
       - targets: ['exporterserver:9199']
-        labels:
-          ups:  "secondary"
     params:
       ups: [ "secondary" ]
       server: [ "nutserver2" ]

@@ -28,7 +28,7 @@ type NutCollectorOpts struct {
 func NewNutCollector(opts NutCollectorOpts) (*NutCollector, error) {
 	deviceDesc := prometheus.NewDesc(prometheus.BuildFQName(opts.Namespace, "", "device_info"),
 		"UPS Device information",
-		deviceLabels, nil,
+		append([]string{"server", "name"}, deviceLabels...), nil,
 	)
 
 	return &NutCollector{
@@ -95,6 +95,8 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 				device[label] = ""
 			}
 
+			constLabels := prometheus.Labels{"server": c.opts.Server, "name": ups.Name}
+
 			log.Debugf("UPS info:")
 			log.Debugf("  Name: %v", ups.Name)
 			log.Debugf("  Description: %v", ups.Description)
@@ -133,7 +135,7 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 						setStatuses := make(map[string]bool)
 						varDesc := prometheus.NewDesc(prometheus.BuildFQName(c.opts.Namespace, "", strings.Replace(variable.Name, ".", "_", -1)),
 							fmt.Sprintf("%s (%s)", variable.Description, variable.Name),
-							[]string{"flag"}, nil,
+							[]string{"flag"}, constLabels,
 						)
 
 						for _, statusFlag := range strings.Split(variable.Value.(string), " ") {
@@ -189,7 +191,7 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 
 					varDesc := prometheus.NewDesc(prometheus.BuildFQName(c.opts.Namespace, "", strings.Replace(variable.Name, ".", "_", -1)),
 						fmt.Sprintf("%s (%s)", variable.Description, variable.Name),
-						nil, nil,
+						nil, constLabels,
 					)
 
 					ch <- prometheus.MustNewConstMetric(varDesc, prometheus.GaugeValue, value)
@@ -198,7 +200,7 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 				}
 			}
 
-			deviceValues := []string{}
+			deviceValues := []string{c.opts.Server, ups.Name}
 			for _, label := range deviceLabels {
 				deviceValues = append(deviceValues, device[label])
 			}
