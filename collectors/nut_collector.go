@@ -52,20 +52,20 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 	if err != nil {
 		log.Error(err)
 	} else {
-		upsList := []nut.UPS{}
+		var upsList []nut.UPS
 		if c.opts.Ups != "" {
-			ups, err := nut.NewUPS(c.opts.Ups, &client)
+			var ups nut.UPS
+			ups, err = nut.NewUPS(c.opts.Ups, &client)
 			if err == nil {
 				log.Debugf("Instantiated UPS named `%s`", c.opts.Ups)
-				upsList = append(upsList, ups)
+				upsList = []nut.UPS{ups}
 			} else {
 				log.Errorf("Failure instantiating the UPS named `%s`: %v", c.opts.Ups, err)
 			}
 		} else {
-			tmp, err := client.GetUPSList()
+			upsList, err = client.GetUPSList()
 			if err == nil {
 				log.Debugf("Obtained list of UPS devices")
-				upsList = tmp
 			} else {
 				log.Errorf("Failure getting the list of UPS devices: %v", err)
 			}
@@ -76,17 +76,7 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 				prometheus.NewDesc(prometheus.BuildFQName(c.opts.Namespace, "", "error"),
 					"Failure gathering UPS variables", nil, nil),
 				err)
-		}
-
-		if len(upsList) > 1 {
-			log.Errorf("Multiple UPS devices were found by NUT for this scrap. For this configuration, you MUST scrape this exporter with a query string parameter indicating which UPS to scrape. Valid values of ups are:")
-			for _, ups := range upsList {
-				log.Errorf("  %s", ups.Name)
-			}
-			ch <- prometheus.NewInvalidMetric(
-				prometheus.NewDesc(prometheus.BuildFQName(c.opts.Namespace, "", "error"),
-					"Multiple UPS devices were found fron NUT. Please add a ups=<name> query string", nil, nil),
-				err)
+			return
 		}
 
 		for _, ups := range upsList {
