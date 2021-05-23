@@ -187,7 +187,10 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 						continue
 					}
 
-					varDesc := prometheus.NewDesc(prometheus.BuildFQName(c.opts.Namespace, "", strings.Replace(variable.Name, ".", "_", -1)),
+					name := strings.Replace(variable.Name, ".", "_", -1)
+					name = strings.Replace(name, "-", "_", -1)
+
+					varDesc := prometheus.NewDesc(prometheus.BuildFQName(c.opts.Namespace, "", name),
 						fmt.Sprintf("%s (%s)", variable.Description, variable.Name),
 						nil, nil,
 					)
