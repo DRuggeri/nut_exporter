@@ -15,6 +15,8 @@ import (
 	"github.com/DRuggeri/nut_exporter/collectors"
 )
 
+var Version string
+
 var (
 	server = kingpin.Flag(
 		"nut.server", "Hostname or IP address of the server to connect to.' ($NUT_EXPORTER_SERVER)",
@@ -154,7 +156,7 @@ func basicAuthHandlerBuilder(parentHandler http.Handler) http.Handler {
 
 func main() {
 	log.AddFlags(kingpin.CommandLine)
-	kingpin.Version(version.Print("nut_exporter"))
+	kingpin.Version(Version)
 	kingpin.HelpFlag.Short('h')
 	kingpin.Parse()
 
@@ -225,8 +227,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	log.Infoln("Starting nut_exporter", version.Info())
-	log.Infoln("Build context", version.BuildContext())
+	log.Infoln("Starting nut_exporter", Version)
 
 	authPassword = os.Getenv("NUT_EXPORTER_WEB_AUTH_PASSWORD")
 	http.Handle(*metricsPath, basicAuthHandlerBuilder(&metricsHandler{}))

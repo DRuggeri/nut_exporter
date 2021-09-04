@@ -176,10 +176,12 @@ $ nut_exporter <flags>
 ```
 
 ### With Docker
-```bash
-docker build -t nut_exporter .
-docker run -d -p 9199:9199 nut_exporter"
-```
+### With Docker
+An official scratch-based Docker image is built with every tag and pushed to DockerHub and ghcr. Additionally, PRs will be tested by GitHubs actions.
+
+The following images are available for use:
+- [druggeri/nut_exporter](https://hub.docker.com/r/druggeri/nut_exporter)
+- [ghcr.io/DRuggeri/nut_exporter](https://ghcr.io/DRuggeri/nut_exporter)
 
 &nbsp;
 

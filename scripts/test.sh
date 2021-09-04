@@ -10,7 +10,7 @@ export GOARCH=""
 #Add this directory to PATH
 export PATH="$PATH:`pwd`"
 
-go build -o "nut_exporter" ../
+go build -ldflags "-X main.Version=testing:$(git rev-list -1 HEAD)" -o "nut_exporter" ../
 
 echo "Running tests..."
 cd ../
