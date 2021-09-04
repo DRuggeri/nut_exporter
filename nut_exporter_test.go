@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -18,11 +19,9 @@ const (
 )
 
 func TestSuccessfulLaunch(t *testing.T) {
-	/*
-		if _, err := os.Stat(binary); err != nil {
-			t.Fatalf("%s binary not available, try to run `go build` first: %s", binary, err)
-		}
-	*/
+        if _, err := os.Stat(binary); err != nil {
+                return
+        }
 
 	exporter := exec.Command(binary, "--web.listen-address", address)
 	test := func(pid int) error {
