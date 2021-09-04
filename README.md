@@ -176,7 +176,6 @@ $ nut_exporter <flags>
 ```
 
 ### With Docker
-### With Docker
 An official scratch-based Docker image is built with every tag and pushed to DockerHub and ghcr. Additionally, PRs will be tested by GitHubs actions.
 
 The following images are available for use:
