@@ -112,12 +112,13 @@ jobs:
       - name: Create scratch docker image
         run: |
           echo "
-          FROM golang:1.17.0-alpine3.14 AS builder
-          RUN apk --no-cache add wget 
-          RUN if uname -m | grep 'x86_64' >/dev/null 2>&1; then wget -O /downloaded_file $URL_LINUX_AMD64;fi \
+          FROM alpine AS builder
+          RUN apk --no-cache add wget \
+           && if uname -m | grep 'x86_64' >/dev/null 2>&1; then wget -O /downloaded_file $URL_LINUX_AMD64;fi \
            && if uname -m | grep 'aarch64' >/dev/null 2>&1; then wget -O /downloaded_file $URL_LINUX_ARM64;fi \
            && if uname -m | grep 'arm' >/dev/null 2>&1; then wget -O /downloaded_file $URL_LINUX_ARM;fi \
-           && if [ ! -f /downloaded_file ];then echo "===Failed to download for:";uname -m;echo "===";exit 1;fi
+           && if [ ! -f /downloaded_file ];then echo "===Failed to download for:";uname -m;echo "===";exit 1;fi \
+           && chmod 755 /downloaded_file
 
           FROM scratch
           COPY --from=builder /downloaded_file /$PROJECT_NAME
