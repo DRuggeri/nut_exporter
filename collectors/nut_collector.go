@@ -28,7 +28,7 @@ type NutCollectorOpts struct {
 func NewNutCollector(opts NutCollectorOpts) (*NutCollector, error) {
 	deviceDesc := prometheus.NewDesc(prometheus.BuildFQName(opts.Namespace, "", "device_info"),
 		"UPS Device information",
-		deviceLabels, nil,
+		append([]string{"server", "name"}, deviceLabels...), nil,
 	)
 
 	return &NutCollector{
@@ -52,20 +52,20 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 	if err != nil {
 		log.Error(err)
 	} else {
-		upsList := []nut.UPS{}
+		var upsList []nut.UPS
 		if c.opts.Ups != "" {
-			ups, err := nut.NewUPS(c.opts.Ups, &client)
+			var ups nut.UPS
+			ups, err = nut.NewUPS(c.opts.Ups, &client)
 			if err == nil {
 				log.Debugf("Instantiated UPS named `%s`", c.opts.Ups)
-				upsList = append(upsList, ups)
+				upsList = []nut.UPS{ups}
 			} else {
 				log.Errorf("Failure instantiating the UPS named `%s`: %v", c.opts.Ups, err)
 			}
 		} else {
-			tmp, err := client.GetUPSList()
+			upsList, err = client.GetUPSList()
 			if err == nil {
 				log.Debugf("Obtained list of UPS devices")
-				upsList = tmp
 			} else {
 				log.Errorf("Failure getting the list of UPS devices: %v", err)
 			}
@@ -76,17 +76,7 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 				prometheus.NewDesc(prometheus.BuildFQName(c.opts.Namespace, "", "error"),
 					"Failure gathering UPS variables", nil, nil),
 				err)
-		}
-
-		if len(upsList) > 1 {
-			log.Errorf("Multiple UPS devices were found by NUT for this scrap. For this configuration, you MUST scrape this exporter with a query string parameter indicating which UPS to scrape. Valid values of ups are:")
-			for _, ups := range upsList {
-				log.Errorf("  %s", ups.Name)
-			}
-			ch <- prometheus.NewInvalidMetric(
-				prometheus.NewDesc(prometheus.BuildFQName(c.opts.Namespace, "", "error"),
-					"Multiple UPS devices were found fron NUT. Please add a ups=<name> query string", nil, nil),
-				err)
+			return
 		}
 
 		for _, ups := range upsList {
@@ -94,6 +84,8 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 			for _, label := range deviceLabels {
 				device[label] = ""
 			}
+
+			constLabels := prometheus.Labels{"server": c.opts.Server, "name": ups.Name}
 
 			log.Debugf("UPS info:")
 			log.Debugf("  Name: %v", ups.Name)
@@ -133,7 +125,7 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 						setStatuses := make(map[string]bool)
 						varDesc := prometheus.NewDesc(prometheus.BuildFQName(c.opts.Namespace, "", strings.Replace(variable.Name, ".", "_", -1)),
 							fmt.Sprintf("%s (%s)", variable.Description, variable.Name),
-							[]string{"flag"}, nil,
+							[]string{"flag"}, constLabels,
 						)
 
 						for _, statusFlag := range strings.Split(variable.Value.(string), " ") {
@@ -192,7 +184,7 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 
 					varDesc := prometheus.NewDesc(prometheus.BuildFQName(c.opts.Namespace, "", name),
 						fmt.Sprintf("%s (%s)", variable.Description, variable.Name),
-						nil, nil,
+						nil, constLabels,
 					)
 
 					ch <- prometheus.MustNewConstMetric(varDesc, prometheus.GaugeValue, value)
@@ -201,7 +193,7 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 				}
 			}
 
-			deviceValues := []string{}
+			deviceValues := []string{c.opts.Server, ups.Name}
 			for _, label := range deviceLabels {
 				deviceValues = append(deviceValues, device[label])
 			}

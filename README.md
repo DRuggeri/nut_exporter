@@ -7,8 +7,6 @@ The variables exposed to a NUT client by the NUT system are the lifeblood of a d
 
  * See the [NUT documentation](https://networkupstools.org/docs/user-manual.chunked/apcs01.html) for a list of all possible variables
  * Variables are set as prometheus metrics with the `ups` name added as a lable. Example: `ups.load` is set as `network_ups_tools_ups_load 100`
- * The exporter SHOULD be called with the ups to scrape set in the query string. Example: `https://127.0.0.1:9199/ups_metrics?ups=foo`
- * If the exporter scrapes NUT and detects more than one UPS, it is an error condition that will fail the scrape. In this case, use a variant of the scrape config example below for your environment
  * Default configs usually permit reading variables without authentication. If you have disabled this, see the Usage below to set credentials
  * This exporter will always export the device.* metrics as labels, except for uptime, with a constant value of 1
  * Setting the `nut.vars_enable` parameter to an empty string will cause all numeric variables to be exported
@@ -87,7 +85,7 @@ Therefore, these are all enabled in the default value for `--nut.statuses`.
 The exporter allows for per-scrape overrides of command line parameters by passing query string parameters. This enables a single nut_exporter to scrape multiple NUT servers
 
 The following query string parameters can be passed to the `/ups_metrics` path:
-  * `ups` - Required if more than one UPS is present in NUT)
+  * `ups` - Export specific UPS only instead of all
   * `server` - Overrides the command line parameter `--nut.server`
   * `username` - Overrides the command line parameter `--nut.username`
   * `password` - Overrides the environment variable NUT_EXPORTER_PASSWORD. It is **strongly** recommended to avoid passing credentials over http unless the exporter is configured with TLS
@@ -96,46 +94,46 @@ The following query string parameters can be passed to the `/ups_metrics` path:
 See the example scrape configurations below for how to utilize this capability
 
 ### Example Scrape Configurations
-Note that this exporter will scrape only one UPS per scrape invocation. If there are multiple UPS devices visible to NUT, you MUST ensure that you set up different scrape configs for each UPS device. Here is an example configuration for such a use case:
+By default all UPSes will be exported.
+
+```
+  - job_name: nut
+    metrics_path: /ups_metrics
+    static_configs:
+      - targets: ['myserver:9199']
+```
+
+Specifying the `ups` parameter limits the output to that one UPS.
 
 ```
   - job_name: nut-primary
     metrics_path: /ups_metrics
     static_configs:
       - targets: ['myserver:9199']
-        labels:
-          ups:  "primary"
     params:
       ups: [ "primary" ]
   - job_name: nut-secondary
     metrics_path: /ups_metrics
     static_configs:
       - targets: ['myserver:9199']
-        labels:
-          ups:  "secondary"
     params:
       ups: [ "secondary" ]
 ```
 
-You can also configure a single exporter to scrape several NUT servers like so:
+You can also configure a single exporter to scrape several NUT servers. The server is added as a metric label.
+
 ```
   - job_name: nut-primary
     metrics_path: /ups_metrics
     static_configs:
       - targets: ['exporterserver:9199']
-        labels:
-          ups:  "primary"
     params:
-      ups: [ "primary" ]
       server: [ "nutserver1" ]
   - job_name: nut-secondary
     metrics_path: /ups_metrics
     static_configs:
       - targets: ['exporterserver:9199']
-        labels:
-          ups:  "secondary"
     params:
-      ups: [ "secondary" ]
       server: [ "nutserver2" ]
 ```
 
