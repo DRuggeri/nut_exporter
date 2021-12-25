@@ -1,18 +1,16 @@
 ### STAGE 1: Build ###
 
-FROM golang:buster as builder
+FROM golang:1-bullseye as builder
 
-RUN mkdir -p /app/src/github.com/DRuggeri/nut_exporter
-ENV GOPATH /app
 WORKDIR /app
-COPY . /app/src/github.com/DRuggeri/nut_exporter
-RUN cd /app/src/github.com/DRuggeri/nut_exporter && go install
+COPY . /app
+RUN go install
 
 ### STAGE 2: Setup ###
 
 FROM alpine
 RUN apk add --no-cache \
   libc6-compat
-COPY --from=builder /app/bin/nut_exporter /nut_exporter
+COPY --from=builder /go/bin/nut_exporter /nut_exporter
 RUN chmod +x /nut_exporter
 ENTRYPOINT ["/nut_exporter"]
