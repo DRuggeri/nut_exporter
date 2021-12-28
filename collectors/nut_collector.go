@@ -2,16 +2,19 @@ package collectors
 
 import (
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/common/log"
-	"github.com/robbiet480/go.nut"
 	"strings"
+
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/robbiet480/go.nut"
 )
 
 var deviceLabels = []string{"model", "mfr", "serial", "type", "description", "contact", "location", "part", "macaddr"}
 
 type NutCollector struct {
 	deviceDesc *prometheus.Desc
+	logger     log.Logger
 	opts       NutCollectorOpts
 }
 
@@ -25,7 +28,7 @@ type NutCollectorOpts struct {
 	Statuses  []string
 }
 
-func NewNutCollector(opts NutCollectorOpts) (*NutCollector, error) {
+func NewNutCollector(opts NutCollectorOpts, logger log.Logger) (*NutCollector, error) {
 	deviceDesc := prometheus.NewDesc(prometheus.BuildFQName(opts.Namespace, "", "device_info"),
 		"UPS Device information",
 		deviceLabels, nil,
@@ -33,41 +36,43 @@ func NewNutCollector(opts NutCollectorOpts) (*NutCollector, error) {
 
 	return &NutCollector{
 		deviceDesc: deviceDesc,
+		logger:     logger,
 		opts:       opts,
 	}, nil
 }
 
 func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
+	level.Debug(c.logger).Log("msg", "Connecting to server", "server", c.opts.Server)
 	client, err := nut.Connect(c.opts.Server)
 	if err == nil {
-		log.Debugf("Connected to server `%v`", c.opts.Server)
+		level.Debug(c.logger).Log("msg", "Connected to server", "server", c.opts.Server)
 		if c.opts.Username != "" && c.opts.Password != "" {
 			_, err = client.Authenticate(c.opts.Username, c.opts.Password)
 			if err != nil {
-				log.Debugf("Authenticated to `%v` as user `%v", c.opts.Server, c.opts.Username)
+				level.Debug(c.logger).Log("msg", "Authenticated", "server", c.opts.Server, "user", c.opts.Username)
 			}
 		}
 	}
 
 	if err != nil {
-		log.Error(err)
+		level.Error(c.logger).Log("err", err)
 	} else {
 		upsList := []nut.UPS{}
 		if c.opts.Ups != "" {
 			ups, err := nut.NewUPS(c.opts.Ups, &client)
 			if err == nil {
-				log.Debugf("Instantiated UPS named `%s`", c.opts.Ups)
+				level.Debug(c.logger).Log("msg", "Instantiated UPS", "name", c.opts.Ups)
 				upsList = append(upsList, ups)
 			} else {
-				log.Errorf("Failure instantiating the UPS named `%s`: %v", c.opts.Ups, err)
+				level.Error(c.logger).Log("msg", "Failure instantiating the UPS", "name", c.opts.Ups, "err", err)
 			}
 		} else {
 			tmp, err := client.GetUPSList()
 			if err == nil {
-				log.Debugf("Obtained list of UPS devices")
+				level.Debug(c.logger).Log("msg", "Obtained list of UPS devices")
 				upsList = tmp
 			} else {
-				log.Errorf("Failure getting the list of UPS devices: %v", err)
+				level.Error(c.logger).Log("msg", "Failure getting the list of UPS devices", "err", err)
 			}
 		}
 
@@ -79,9 +84,9 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 		}
 
 		if len(upsList) > 1 {
-			log.Errorf("Multiple UPS devices were found by NUT for this scrap. For this configuration, you MUST scrape this exporter with a query string parameter indicating which UPS to scrape. Valid values of ups are:")
+			level.Error(c.logger).Log("msg", "Multiple UPS devices were found by NUT for this scrap. For this configuration, you MUST scrape this exporter with a query string parameter indicating which UPS to scrape. Valid values of ups are:")
 			for _, ups := range upsList {
-				log.Errorf("  %s", ups.Name)
+				level.Error(c.logger).Log("name", ups.Name)
 			}
 			ch <- prometheus.NewInvalidMetric(
 				prometheus.NewDesc(prometheus.BuildFQName(c.opts.Namespace, "", "error"),
@@ -95,29 +100,29 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 				device[label] = ""
 			}
 
-			log.Debugf("UPS info:")
-			log.Debugf("  Name: %v", ups.Name)
-			log.Debugf("  Description: %v", ups.Description)
-			log.Debugf("  Master: %v", ups.Master)
-			log.Debugf("  NumberOfLogins: %v", ups.NumberOfLogins)
-			log.Debug("  Clients:")
+			level.Debug(c.logger).Log(
+				"msg", "UPS info",
+				"name", ups.Name,
+				"description", ups.Description,
+				"master", ups.Master,
+				"nmumber_of_logins", ups.NumberOfLogins,
+			)
 			for i, clientName := range ups.Clients {
-				log.Debugf("    %v: %v", i, clientName)
+				level.Debug(c.logger).Log("client", i, "name", clientName)
 			}
-			log.Debug("  Commands:")
 			for _, command := range ups.Commands {
-				log.Debugf("    %v: %v", command.Name, command.Description)
+				level.Debug(c.logger).Log("command", command.Name, "description", command.Description)
 			}
-			log.Debug("  Variables:")
 			for _, variable := range ups.Variables {
-				log.Debugf("    %v:", variable.Name)
-				log.Debugf("      Value: '%v'", variable.Value)
-				log.Debugf("      Type: %v", variable.Type)
-				log.Debugf("      Description: '%v'", variable.Description)
-				log.Debugf("      Writeable: %v", variable.Writeable)
-				log.Debugf("      MaximumLength: %v", variable.MaximumLength)
-				log.Debugf("      OriginalType: %v", variable.OriginalType)
-
+				level.Debug(c.logger).Log(
+					"variable_name", variable.Name,
+					"value", variable.Value,
+					"type", variable.Type,
+					"description", variable.Description,
+					"writeable", variable.Writeable,
+					"maximum_length", variable.MaximumLength,
+					"original_type", variable.OriginalType,
+				)
 				path := strings.Split(variable.Name, ".")
 				if path[0] == "device" {
 					device[path[1]] = fmt.Sprintf("%v", variable.Value)
@@ -125,7 +130,7 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 
 				/* Done special processing - now get as general as possible and gather all requested or number-like metrics */
 				if len(c.opts.Variables) == 0 || sliceContains(c.opts.Variables, variable.Name) {
-					log.Debugf("      Export the variable? true")
+					level.Debug(c.logger).Log("msg", "Export the variable? true")
 					value := float64(0)
 
 					/* Deal with ups.status specially because it is a collection of 'flags' */
@@ -183,7 +188,7 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 						   listing UNKNOWN or NUMBER instead of STRING? */
 						continue
 					default:
-						log.Warnf("Variable from nut client library `%s` is of unknown type `%T` (claimed=`%v` value=`%v`)", variable.Name, v, variable.Type, v)
+						level.Warn(c.logger).Log("Unknonw variable type from nut client library", "name", variable.Name, "type", fmt.Sprintf("%T", v), "claimed_type", variable.Type, "value", v)
 						continue
 					}
 
@@ -197,7 +202,7 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 
 					ch <- prometheus.MustNewConstMetric(varDesc, prometheus.GaugeValue, value)
 				} else {
-					log.Debugf("      Export the variable? false (%v) (%v)", len(c.opts.Variables), c.opts.Variables)
+					level.Debug(c.logger).Log("msg", "Export the variable? false", "count", len(c.opts.Variables), "variables", c.opts.Variables)
 				}
 			}
 

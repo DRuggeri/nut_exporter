@@ -1,10 +1,10 @@
 package main
 
 import (
-	"os"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"os/exec"
 	"testing"
 	"time"
@@ -19,9 +19,9 @@ const (
 )
 
 func TestSuccessfulLaunch(t *testing.T) {
-        if _, err := os.Stat(binary); err != nil {
-                return
-        }
+	if _, err := os.Stat(binary); err != nil {
+		return
+	}
 
 	exporter := exec.Command(binary, "--web.listen-address", address)
 	test := func(pid int) error {

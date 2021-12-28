@@ -6,9 +6,12 @@ import (
 	"os"
 	"strings"
 
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/prometheus/common/log"
+	"github.com/prometheus/common/promlog"
+	"github.com/prometheus/common/promlog/flag"
 	"github.com/prometheus/common/version"
 	"gopkg.in/alecthomas/kingpin.v2"
 
@@ -70,6 +73,8 @@ var (
 )
 var collectorOpts collectors.NutCollectorOpts
 
+var logger log.Logger
+
 func init() {
 	prometheus.MustRegister(version.NewCollector(*metricsNamespace))
 }
@@ -86,13 +91,12 @@ type metricsHandler struct {
 func (h *basicAuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	username, password, ok := r.BasicAuth()
 	if !ok || username != h.username || password != h.password {
-		log.Errorf("Invalid HTTP auth from `%s`", r.RemoteAddr)
+		level.Error(logger).Log("msg", "Invalid HTTP auth", "remote_addr", r.RemoteAddr)
 		w.Header().Set("WWW-Authenticate", "Basic realm=\"metrics\"")
 		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
 		return
 	}
 	h.handler(w, r)
-	return
 }
 
 func (h *metricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -126,11 +130,11 @@ func (h *metricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		thisCollectorOpts.Statuses = strings.Split(r.URL.Query().Get("statuses"), ",")
 	}
 
-	nutCollector, err := collectors.NewNutCollector(thisCollectorOpts)
+	nutCollector, err := collectors.NewNutCollector(thisCollectorOpts, logger)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("500 - InternalServer Error"))
-		log.Error(err)
+		level.Error(logger).Log("msg", "Internal server error", "err", err)
 		return
 	}
 	registry := prometheus.NewRegistry()
@@ -139,7 +143,6 @@ func (h *metricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	newHandler := promhttp.HandlerFor(registry, promhttp.HandlerOpts{})
 	newHandler = promhttp.InstrumentMetricHandler(registry, newHandler)
 	newHandler.ServeHTTP(w, r)
-	return
 }
 
 func basicAuthHandlerBuilder(parentHandler http.Handler) http.Handler {
@@ -155,16 +158,17 @@ func basicAuthHandlerBuilder(parentHandler http.Handler) http.Handler {
 }
 
 func main() {
-	log.AddFlags(kingpin.CommandLine)
+	promlogConfig := &promlog.Config{}
+	flag.AddFlags(kingpin.CommandLine, promlogConfig)
 	kingpin.Version(Version)
 	kingpin.HelpFlag.Short('h')
 	kingpin.Parse()
 
 	if *nutUsername != "" {
-		log.Infoln("Authenticating to NUT server")
+		level.Info(logger).Log("msg", "Authenticating to NUT server")
 		nutPassword = os.Getenv("NUT_EXPORTER_PASSWORD")
 		if nutPassword == "" {
-			log.Error("Username set, but NUT_EXPORTER_PASSWORD environment variable missing. Cannot authenticate!")
+			level.Error(logger).Log("msg", "Username set, but NUT_EXPORTER_PASSWORD environment variable missing. Cannot authenticate!")
 			os.Exit(2)
 		}
 	}
@@ -218,7 +222,7 @@ func main() {
 		   - When the describe function exits after returning the last item, close the channel to end the background consume function
 		*/
 		fmt.Println("NUT")
-		nutCollector, _ := collectors.NewNutCollector(collectorOpts)
+		nutCollector, _ := collectors.NewNutCollector(collectorOpts, logger)
 		out = make(chan *prometheus.Desc)
 		go eatOutput(out)
 		nutCollector.Describe(out)
@@ -227,7 +231,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	log.Infoln("Starting nut_exporter", Version)
+	level.Info(logger).Log("msg", "Starting nut_exporter", "version", Version)
 
 	authPassword = os.Getenv("NUT_EXPORTER_WEB_AUTH_PASSWORD")
 	http.Handle(*metricsPath, basicAuthHandlerBuilder(&metricsHandler{}))
@@ -244,10 +248,16 @@ func main() {
 	})
 
 	if *tlsCertFile != "" && *tlsKeyFile != "" {
-		log.Infoln("Listening TLS on", *listenAddress)
-		log.Fatal(http.ListenAndServeTLS(*listenAddress, *tlsCertFile, *tlsKeyFile, nil))
+		level.Info(logger).Log("msg", "Listening on TLS", "address", *listenAddress)
+		if err := http.ListenAndServeTLS(*listenAddress, *tlsCertFile, *tlsKeyFile, nil); err != nil {
+			level.Error(logger).Log("err", err)
+			os.Exit(1)
+		}
 	} else {
-		log.Infoln("Listening on", *listenAddress)
-		log.Fatal(http.ListenAndServe(*listenAddress, nil))
+		level.Info(logger).Log("msg", "Listening on", "address", *listenAddress)
+		if err := http.ListenAndServe(*listenAddress, nil); err != nil {
+			level.Error(logger).Log("err", err)
+			os.Exit(1)
+		}
 	}
 }
