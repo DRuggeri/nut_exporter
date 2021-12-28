@@ -6,13 +6,15 @@ import (
 	"os"
 	"strings"
 
+	"github.com/alecthomas/kingpin/v2"
 	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/promlog"
 	"github.com/prometheus/common/promlog/flag"
 	"github.com/prometheus/common/version"
-	"gopkg.in/alecthomas/kingpin.v2"
+	"github.com/prometheus/exporter-toolkit/web"
+	"github.com/prometheus/exporter-toolkit/web/kingpinflag"
 
 	"github.com/DRuggeri/nut_exporter/collectors"
 )
@@ -53,9 +55,7 @@ var (
 		"metrics.namespace", "Metrics Namespace ($NUT_EXPORTER_METRICS_NAMESPACE)",
 	).Envar("NUT_EXPORTER_METRICS_NAMESPACE").Default("network_ups_tools").String()
 
-	listenAddress = kingpin.Flag(
-		"web.listen-address", "Address to listen on for web interface and telemetry ($NUT_EXPORTER_WEB_LISTEN_ADDRESS)",
-	).Envar("NUT_EXPORTER_WEB_LISTEN_ADDRESS").Default(":9199").String()
+	tookitFlags = kingpinflag.AddFlags(kingpin.CommandLine, ":9199")
 
 	metricsPath = kingpin.Flag(
 		"web.telemetry-path", "Path under which to expose the UPS Prometheus metrics ($NUT_EXPORTER_WEB_TELEMETRY_PATH)",
@@ -64,19 +64,6 @@ var (
 	exporterMetricsPath = kingpin.Flag(
 		"web.exporter-telemetry-path", "Path under which to expose process metrics about this exporter ($NUT_EXPORTER_WEB_EXPORTER_TELEMETRY_PATH)",
 	).Envar("NUT_EXPORTER_WEB_EXPORTER_TELEMETRY_PATH").Default("/metrics").String()
-
-	authUsername = kingpin.Flag(
-		"web.auth.username", "Username for web interface basic auth ($NUT_EXPORTER_WEB_AUTH_USERNAME)",
-	).Envar("NUT_EXPORTER_WEB_AUTH_USERNAME").String()
-	authPassword = ""
-
-	tlsCertFile = kingpin.Flag(
-		"web.tls.cert_file", "Path to a file that contains the TLS certificate (PEM format). If the certificate is signed by a certificate authority, the file should be the concatenation of the server's certificate, any intermediates, and the CA's certificate ($NUT_EXPORTER_WEB_TLS_CERTFILE)",
-	).Envar("NUT_EXPORTER_WEB_TLS_KEYFILE").ExistingFile()
-
-	tlsKeyFile = kingpin.Flag(
-		"web.tls.key_file", "Path to a file that contains the TLS private key (PEM format) ($NUT_EXPORTER_WEB_TLS_KEYFILE)",
-	).Envar("NUT_EXPORTER_WEB_TLS_KEYFILE").ExistingFile()
 
 	printMetrics = kingpin.Flag(
 		"printMetrics", "Print the metrics this exporter exposes and exits. Default: false ($NUT_EXPORTER_PRINT_METRICS)",
@@ -90,25 +77,8 @@ func init() {
 	prometheus.MustRegister(version.NewCollector(*metricsNamespace))
 }
 
-type basicAuthHandler struct {
-	handler  http.HandlerFunc
-	username string
-	password string
-}
-
 type metricsHandler struct {
 	handlers map[string]*http.Handler
-}
-
-func (h *basicAuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	username, password, ok := r.BasicAuth()
-	if !ok || username != h.username || password != h.password {
-		level.Error(logger).Log("msg", "Invalid HTTP auth", "remote_addr", r.RemoteAddr)
-		w.Header().Set("WWW-Authenticate", "Basic realm=\"metrics\"")
-		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
-		return
-	}
-	h.handler(w, r)
 }
 
 func (h *metricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -159,18 +129,6 @@ func (h *metricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	promHandler.ServeHTTP(w, r)
-}
-
-func basicAuthHandlerBuilder(parentHandler http.Handler) http.Handler {
-	if *authUsername != "" && authPassword != "" {
-		return &basicAuthHandler{
-			handler:  parentHandler.ServeHTTP,
-			username: *authUsername,
-			password: authPassword,
-		}
-	}
-
-	return parentHandler
 }
 
 func main() {
@@ -255,14 +213,12 @@ func main() {
 
 	level.Info(logger).Log("msg", "Starting nut_exporter", "version", Version)
 
-	authPassword = os.Getenv("NUT_EXPORTER_WEB_AUTH_PASSWORD")
-
-	metricsHandler := &metricsHandler{
+	handler := &metricsHandler{
 		handlers: make(map[string]*http.Handler),
 	}
 
-	http.Handle(*metricsPath, basicAuthHandlerBuilder(metricsHandler))
-	http.Handle(*exporterMetricsPath, basicAuthHandlerBuilder(promhttp.Handler()))
+	http.Handle(*metricsPath, handler)
+	http.Handle(*exporterMetricsPath, promhttp.Handler())
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`<html>
              <head><title>NUT Exporter</title></head>
@@ -274,17 +230,9 @@ func main() {
              </html>`))
 	})
 
-	if *tlsCertFile != "" && *tlsKeyFile != "" {
-		level.Info(logger).Log("msg", "Listening on TLS", "address", *listenAddress)
-		if err := http.ListenAndServeTLS(*listenAddress, *tlsCertFile, *tlsKeyFile, nil); err != nil {
-			level.Error(logger).Log("err", err)
-			os.Exit(1)
-		}
-	} else {
-		level.Info(logger).Log("msg", "Listening on", "address", *listenAddress)
-		if err := http.ListenAndServe(*listenAddress, nil); err != nil {
-			level.Error(logger).Log("err", err)
-			os.Exit(1)
-		}
+	srv := &http.Server{}
+	if err := web.ListenAndServe(srv, tookitFlags, logger); err != nil {
+		level.Error(logger).Log("err", err)
+		os.Exit(1)
 	}
 }
