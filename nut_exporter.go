@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -73,7 +72,7 @@ var (
 )
 var collectorOpts collectors.NutCollectorOpts
 
-var logger log.Logger
+var logger = promlog.New(&promlog.Config{})
 
 func init() {
 	prometheus.MustRegister(version.NewCollector(*metricsNamespace))
