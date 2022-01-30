@@ -26,7 +26,7 @@ var (
 
 	nutUsername = kingpin.Flag(
 		"nut.username", "If set, will authenticate with this username to the server. Password must be set in NUT_EXPORTER_PASSWORD environment variable.' ($NUT_EXPORTER_USERNAME)",
-	).Envar("NUT_EXPORTER_SERVER").String()
+	).Envar("NUT_EXPORTER_USERNAME").String()
 	nutPassword = ""
 
 	enableFilter = kingpin.Flag(
