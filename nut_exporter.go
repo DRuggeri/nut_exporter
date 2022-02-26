@@ -163,6 +163,9 @@ func main() {
 	kingpin.HelpFlag.Short('h')
 	kingpin.Parse()
 
+	/* Reconfigure logger after parsing arguments */
+	logger = promlog.New(promlogConfig)
+
 	if *nutUsername != "" {
 		level.Info(logger).Log("msg", "Authenticating to NUT server")
 		nutPassword = os.Getenv("NUT_EXPORTER_PASSWORD")
