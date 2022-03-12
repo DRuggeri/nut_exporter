@@ -17,7 +17,7 @@ import (
 	"github.com/DRuggeri/nut_exporter/collectors"
 )
 
-var Version string
+var Version = "testing"
 
 var (
 	server = kingpin.Flag(
