@@ -8,7 +8,7 @@ builds:
     flags:
       - -trimpath
     ldflags:
-      - '-X main.version={{ .Version }} -X main.commit={{ .Commit }}'
+      - '-X main.Version={{ .Version }} -X main.Commit={{ .Commit }}'
     goos:
       - freebsd
       - windows
@@ -28,5 +28,3 @@ archives:
     name_template: "{{ .ProjectName }}-v{{ .Version }}-{{ .Os }}-{{ .Arch }}"
 release:
   draft: false
-changelog:
-  skip: true
