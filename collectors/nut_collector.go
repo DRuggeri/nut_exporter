@@ -2,6 +2,7 @@ package collectors
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/go-kit/log"
@@ -16,6 +17,8 @@ type NutCollector struct {
 	deviceDesc *prometheus.Desc
 	logger     log.Logger
 	opts       NutCollectorOpts
+	onRegex    *regexp.Regexp
+	offRegex   *regexp.Regexp
 }
 
 type NutCollectorOpts struct {
@@ -26,6 +29,8 @@ type NutCollectorOpts struct {
 	Password  string
 	Variables []string
 	Statuses  []string
+	OnRegex   string
+	OffRegex  string
 }
 
 func NewNutCollector(opts NutCollectorOpts, logger log.Logger) (*NutCollector, error) {
@@ -34,10 +39,29 @@ func NewNutCollector(opts NutCollectorOpts, logger log.Logger) (*NutCollector, e
 		deviceLabels, nil,
 	)
 
+	var onRegex, offRegex *regexp.Regexp
+	var err error
+
+	if opts.OnRegex != "" {
+		onRegex, err = regexp.Compile(fmt.Sprintf("(?i)%s", opts.OnRegex))
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if opts.OffRegex != "" {
+		offRegex, err = regexp.Compile(fmt.Sprintf("(?i)%s", opts.OffRegex))
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return &NutCollector{
 		deviceDesc: deviceDesc,
 		logger:     logger,
 		opts:       opts,
+		onRegex:    onRegex,
+		offRegex:   offRegex,
 	}, nil
 }
 
@@ -159,10 +183,20 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 						continue
 					}
 
-					/* All numbers are coaxed to native types by the library, so at this point we know
-					   we cannot set this value because a string will never be a float-like number */
+					/* All numbers are coaxed to native types by the library, so see if we can figure out
+					   if this string could possible represent a binary value
+					*/
 					if strings.ToLower(variable.Type) == "string" {
-						continue
+						if c.onRegex != nil && c.onRegex.MatchString(variable.Value.(string)) {
+							level.Debug(c.logger).Log("msg", "Converted string to 1 due to regex match", "value", variable.Value.(string))
+							value = float64(1)
+						} else if c.offRegex != nil && c.offRegex.MatchString(variable.Value.(string)) {
+							level.Debug(c.logger).Log("msg", "Converted string to 0 due to regex match", "value", variable.Value.(string))
+							value = float64(0)
+						} else {
+							level.Debug(c.logger).Log("msg", "Cannot convert string to binary 0/1", "value", variable.Value.(string))
+							continue
+						}
 					}
 
 					/* This is overkill - the library only deals with bool, string, int64 and float64 */

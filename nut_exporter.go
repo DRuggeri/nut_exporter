@@ -33,6 +33,14 @@ var (
 		"nut.vars_enable", "A comma-separated list of variable names to monitor. See the variable notes in README.' ($NUT_EXPORTER_VARIABLES)",
 	).Envar("NUT_EXPORTER_VARIABLES").Default("battery.charge,battery.voltage,battery.voltage.nominal,input.voltage,input.voltage.nominal,ups.load,ups.status").String()
 
+	onRegex = kingpin.Flag(
+		"nut.on_regex", "This regular expression will be used to determine if the var's value should be coaxed to 1 if it is a string. Match is case-insensitive. ($NUT_EXPORTER_ON_REGEX)",
+	).Envar("NUT_EXPORTER_ON_REGEX").Default("^(enable|enabled|on|true|active|activated)$").String()
+
+	offRegex = kingpin.Flag(
+		"nut.off_regex", "This regular expression will be used to determine if the var's value should be coaxed to 0 if it is a string. Match is case-insensitive. ($NUT_EXPORTER_OFF_REGEX)",
+	).Envar("NUT_EXPORTER_OFF_REGEX").Default("^(disable|disabled|off|false|inactive|deactivated)$").String()
+
 	statusList = kingpin.Flag(
 		"nut.statuses", "A comma-separated list of statuses labels that will always be set by the exporter. If NUT does not set these flags, the exporter will force the network_ups_tools_ups_status{flag=\"NAME\"} to 0. See the ups.status notes in README.' ($NUT_EXPORTER_STATUSES)",
 	).Envar("NUT_EXPORTER_STATUSES").Default("OL,OB,LB,HB,RB,CHRG,DISCHRG,BYPASS,CAL,OFF,OVER,TRIM,BOOST,FSD,SD").String()
@@ -202,6 +210,8 @@ func main() {
 		Password:  nutPassword,
 		Variables: variables,
 		Statuses:  statuses,
+		OnRegex:   *onRegex,
+		OffRegex:  *offRegex,
 	}
 
 	if *printMetrics {
