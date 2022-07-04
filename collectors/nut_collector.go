@@ -183,22 +183,6 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 						continue
 					}
 
-					/* All numbers are coaxed to native types by the library, so see if we can figure out
-					   if this string could possible represent a binary value
-					*/
-					if strings.ToLower(variable.Type) == "string" {
-						if c.onRegex != nil && c.onRegex.MatchString(variable.Value.(string)) {
-							level.Debug(c.logger).Log("msg", "Converted string to 1 due to regex match", "value", variable.Value.(string))
-							value = float64(1)
-						} else if c.offRegex != nil && c.offRegex.MatchString(variable.Value.(string)) {
-							level.Debug(c.logger).Log("msg", "Converted string to 0 due to regex match", "value", variable.Value.(string))
-							value = float64(0)
-						} else {
-							level.Debug(c.logger).Log("msg", "Cannot convert string to binary 0/1", "value", variable.Value.(string))
-							continue
-						}
-					}
-
 					/* This is overkill - the library only deals with bool, string, int64 and float64 */
 					switch v := variable.Value.(type) {
 					case bool:
@@ -218,11 +202,22 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 					case float64:
 						value = float64(v)
 					case string:
-						/* Nothing we can do here. Bug in nut client library
-						   listing UNKNOWN or NUMBER instead of STRING? */
+						/* All numbers should be coaxed to native types by the library, so see if we can figure out
+						   if this string could possible represent a binary value
+						*/
+						if c.onRegex != nil && c.onRegex.MatchString(variable.Value.(string)) {
+							level.Debug(c.logger).Log("msg", "Converted string to 1 due to regex match", "value", variable.Value.(string))
+							value = float64(1)
+						} else if c.offRegex != nil && c.offRegex.MatchString(variable.Value.(string)) {
+							level.Debug(c.logger).Log("msg", "Converted string to 0 due to regex match", "value", variable.Value.(string))
+							value = float64(0)
+						} else {
+							level.Debug(c.logger).Log("msg", "Cannot convert string to binary 0/1", "value", variable.Value.(string))
+							continue
+						}
 						continue
 					default:
-						level.Warn(c.logger).Log("Unknonw variable type from nut client library", "name", variable.Name, "type", fmt.Sprintf("%T", v), "claimed_type", variable.Type, "value", v)
+						level.Warn(c.logger).Log("Unknown variable type from nut client library", "name", variable.Name, "type", fmt.Sprintf("%T", v), "claimed_type", variable.Type, "value", v)
 						continue
 					}
 
