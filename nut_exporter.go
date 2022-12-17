@@ -21,16 +21,20 @@ var Version = "testing"
 
 var (
 	server = kingpin.Flag(
-		"nut.server", "Hostname or IP address of the server to connect to.' ($NUT_EXPORTER_SERVER)",
+		"nut.server", "Hostname or IP address of the server to connect to. ($NUT_EXPORTER_SERVER)",
 	).Envar("NUT_EXPORTER_SERVER").Default("127.0.0.1").String()
 
 	nutUsername = kingpin.Flag(
-		"nut.username", "If set, will authenticate with this username to the server. Password must be set in NUT_EXPORTER_PASSWORD environment variable.' ($NUT_EXPORTER_USERNAME)",
+		"nut.username", "If set, will authenticate with this username to the server. Password must be set in NUT_EXPORTER_PASSWORD environment variable. ($NUT_EXPORTER_USERNAME)",
 	).Envar("NUT_EXPORTER_USERNAME").String()
 	nutPassword = ""
 
+	disableDeviceInfo = kingpin.Flag(
+		"nut.disable_device_info", "A flag to disable the generation of the device_info meta metric. ($NUT_EXPORTER_DISABLE_DEVICE_INFO)",
+	).Envar("NUT_EXPORTER_DISABLE_DEVICE_INFO").Default("false").Bool()
+
 	enableFilter = kingpin.Flag(
-		"nut.vars_enable", "A comma-separated list of variable names to monitor. See the variable notes in README.' ($NUT_EXPORTER_VARIABLES)",
+		"nut.vars_enable", "A comma-separated list of variable names to monitor. See the variable notes in README. ($NUT_EXPORTER_VARIABLES)",
 	).Envar("NUT_EXPORTER_VARIABLES").Default("battery.charge,battery.voltage,battery.voltage.nominal,input.voltage,input.voltage.nominal,ups.load,ups.status").String()
 
 	onRegex = kingpin.Flag(
@@ -109,15 +113,8 @@ func (h *basicAuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *metricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	thisCollectorOpts := collectors.NutCollectorOpts{
-		Namespace: collectorOpts.Namespace,
-		Server:    collectorOpts.Server,
-		Username:  collectorOpts.Username,
-		Password:  collectorOpts.Password,
-		Variables: collectorOpts.Variables,
-		Statuses:  collectorOpts.Statuses,
-		Ups:       r.URL.Query().Get("ups"),
-	}
+	thisCollectorOpts := collectorOpts
+	thisCollectorOpts.Ups = r.URL.Query().Get("ups")
 
 	if r.URL.Query().Get("server") != "" {
 		thisCollectorOpts.Server = r.URL.Query().Get("server")
@@ -203,14 +200,15 @@ func main() {
 	}
 
 	collectorOpts = collectors.NutCollectorOpts{
-		Namespace: *metricsNamespace,
-		Server:    *server,
-		Username:  *nutUsername,
-		Password:  nutPassword,
-		Variables: variables,
-		Statuses:  statuses,
-		OnRegex:   *onRegex,
-		OffRegex:  *offRegex,
+		Namespace:         *metricsNamespace,
+		Server:            *server,
+		Username:          *nutUsername,
+		Password:          nutPassword,
+		DisableDeviceInfo: *disableDeviceInfo,
+		Variables:         variables,
+		Statuses:          statuses,
+		OnRegex:           *onRegex,
+		OffRegex:          *offRegex,
 	}
 
 	if *printMetrics {

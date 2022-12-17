@@ -8,7 +8,7 @@ import (
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/robbiet480/go.nut"
+	nut "github.com/robbiet480/go.nut"
 )
 
 var deviceLabels = []string{"model", "mfr", "serial", "type", "description", "contact", "location", "part", "macaddr"}
@@ -22,15 +22,16 @@ type NutCollector struct {
 }
 
 type NutCollectorOpts struct {
-	Namespace string
-	Server    string
-	Ups       string
-	Username  string
-	Password  string
-	Variables []string
-	Statuses  []string
-	OnRegex   string
-	OffRegex  string
+	Namespace         string
+	Server            string
+	Ups               string
+	Username          string
+	Password          string
+	Variables         []string
+	Statuses          []string
+	OnRegex           string
+	OffRegex          string
+	DisableDeviceInfo bool
 }
 
 func NewNutCollector(opts NutCollectorOpts, logger log.Logger) (*NutCollector, error) {
@@ -38,6 +39,9 @@ func NewNutCollector(opts NutCollectorOpts, logger log.Logger) (*NutCollector, e
 		"UPS Device information",
 		deviceLabels, nil,
 	)
+	if opts.DisableDeviceInfo {
+		deviceDesc = nil
+	}
 
 	var onRegex, offRegex *regexp.Regexp
 	var err error
@@ -235,18 +239,23 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 				}
 			}
 
-			deviceValues := []string{}
-			for _, label := range deviceLabels {
-				deviceValues = append(deviceValues, device[label])
+			// Only provide device info if not disabled
+			if !c.opts.DisableDeviceInfo {
+				deviceValues := []string{}
+				for _, label := range deviceLabels {
+					deviceValues = append(deviceValues, device[label])
+				}
+				ch <- prometheus.MustNewConstMetric(c.deviceDesc, prometheus.GaugeValue, float64(1), deviceValues...)
 			}
-			ch <- prometheus.MustNewConstMetric(c.deviceDesc, prometheus.GaugeValue, float64(1), deviceValues...)
 		}
 		client.Disconnect()
 	}
 }
 
 func (c *NutCollector) Describe(ch chan<- *prometheus.Desc) {
-	ch <- c.deviceDesc
+	if !c.opts.DisableDeviceInfo {
+		ch <- c.deviceDesc
+	}
 }
 
 func sliceContains(c []string, value string) bool {
