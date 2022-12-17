@@ -93,6 +93,8 @@ type basicAuthHandler struct {
 }
 
 type metricsHandler struct {
+	registry    *prometheus.Registry
+	promHandler http.Handler
 }
 
 func (h *basicAuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -144,12 +146,9 @@ func (h *metricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		level.Error(logger).Log("msg", "Internal server error", "err", err)
 		return
 	}
-	registry := prometheus.NewRegistry()
-	registry.MustRegister(nutCollector)
-
-	newHandler := promhttp.HandlerFor(registry, promhttp.HandlerOpts{})
-	newHandler = promhttp.InstrumentMetricHandler(registry, newHandler)
-	newHandler.ServeHTTP(w, r)
+	h.registry.MustRegister(nutCollector)
+	h.promHandler.ServeHTTP(w, r)
+	h.registry.Unregister(nutCollector)
 }
 
 func basicAuthHandlerBuilder(parentHandler http.Handler) http.Handler {
@@ -187,7 +186,7 @@ func main() {
 	for _, varName := range strings.Split(*enableFilter, ",") {
 		// Be nice and clear spaces for those that like them
 		variable := strings.Trim(varName, " ")
-		if "" == variable {
+		if variable == "" {
 			continue
 		}
 		variables = append(variables, strings.Trim(varName, " "))
@@ -197,7 +196,7 @@ func main() {
 	for _, status := range strings.Split(*statusList, ",") {
 		// Be nice and clear spaces for those that like them
 		stat := strings.Trim(status, " ")
-		if "" == stat {
+		if stat == "" {
 			continue
 		}
 		statuses = append(statuses, strings.Trim(stat, " "))
@@ -246,7 +245,17 @@ func main() {
 	level.Info(logger).Log("msg", "Starting nut_exporter", "version", Version)
 
 	authPassword = os.Getenv("NUT_EXPORTER_WEB_AUTH_PASSWORD")
-	http.Handle(*metricsPath, basicAuthHandlerBuilder(&metricsHandler{}))
+
+	//Build a custom registry to include only the UPS metrics on the UPS metrics path
+	registry := prometheus.NewRegistry()
+	promHandler := promhttp.HandlerFor(registry, promhttp.HandlerOpts{Registry: registry})
+	promHandler = promhttp.InstrumentMetricHandler(registry, promHandler)
+	metricsHandler := &metricsHandler{
+		registry:    registry,
+		promHandler: promHandler,
+	}
+
+	http.Handle(*metricsPath, basicAuthHandlerBuilder(metricsHandler))
 	http.Handle(*exporterMetricsPath, basicAuthHandlerBuilder(promhttp.Handler()))
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`<html>
