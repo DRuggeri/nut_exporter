@@ -73,7 +73,7 @@ func NewNutCollector(opts NutCollectorOpts, logger log.Logger) (*NutCollector, e
 		if err != nil {
 			level.Warn(logger).Log("msg", "Error detected while verifying UPS name - proceeding without validation", "error", err)
 		} else if !valid {
-			return nil, fmt.Errorf("%s UPS is not a valid name in the NUT server", opts.Ups)
+			return nil, fmt.Errorf("%s UPS is not a valid name in the NUT server %s", opts.Ups, opts.Server)
 		}
 	}
 

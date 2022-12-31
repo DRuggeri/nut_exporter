@@ -113,8 +113,7 @@ func (h *basicAuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (h *metricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	thisCollectorOpts := collectorOpts
-	upsName := r.URL.Query().Get("ups")
-	thisCollectorOpts.Ups = upsName
+	thisCollectorOpts.Ups = r.URL.Query().Get("ups")
 
 	if r.URL.Query().Get("server") != "" {
 		thisCollectorOpts.Server = r.URL.Query().Get("server")
@@ -137,12 +136,13 @@ func (h *metricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var promHandler http.Handler
-	if tmp, ok := h.handlers[upsName]; ok {
-		level.Debug(logger).Log("msg", fmt.Sprintf("Using existing handler for UPS named `%s`", upsName))
+	cacheName := fmt.Sprintf("%s/%s", thisCollectorOpts.Server, thisCollectorOpts.Ups)
+	if tmp, ok := h.handlers[cacheName]; ok {
+		level.Debug(logger).Log("msg", fmt.Sprintf("Using existing handler for UPS `%s`", cacheName))
 		promHandler = *tmp
 	} else {
 		//Build a custom registry to include only the UPS metrics on the UPS metrics path
-		level.Info(logger).Log("msg", fmt.Sprintf("Creating new registry, handler, and collector for UPS named `%s`", upsName))
+		level.Info(logger).Log("msg", fmt.Sprintf("Creating new registry, handler, and collector for UPS `%s`", cacheName))
 		registry := prometheus.NewRegistry()
 		promHandler = promhttp.HandlerFor(registry, promhttp.HandlerOpts{Registry: registry})
 		promHandler = promhttp.InstrumentMetricHandler(registry, promHandler)
@@ -155,7 +155,7 @@ func (h *metricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		registry.MustRegister(nutCollector)
-		h.handlers[upsName] = &promHandler
+		h.handlers[cacheName] = &promHandler
 	}
 
 	promHandler.ServeHTTP(w, r)
