@@ -22,6 +22,7 @@ builds:
     ignore:
       - goos: darwin
         goarch: '386'
+    mod_timestamp: '{{ .CommitTimestamp }}'
 
 archives:
   - format: binary
