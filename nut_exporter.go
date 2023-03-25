@@ -66,7 +66,7 @@ var (
 	).Envar("NUT_EXPORTER_WEB_EXPORTER_TELEMETRY_PATH").Default("/metrics").String()
 
 	authUsername = kingpin.Flag(
-		"web.auth.username", "Username for web interface basic auth ($NUT_EXPORTER_WEB_AUTH_USERNAME)",
+		"web.auth.username", "Username for web interface basic auth. Password must be set in NUT_EXPORTER_WEB_AUTH_PASSWORD environment variable ($NUT_EXPORTER_WEB_AUTH_USERNAME)",
 	).Envar("NUT_EXPORTER_WEB_AUTH_USERNAME").String()
 	authPassword = ""
 

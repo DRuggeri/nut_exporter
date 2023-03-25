@@ -196,38 +196,39 @@ The following images are available for use:
 usage: nut_exporter [<flags>]
 
 Flags:
-  -h, --help                    Show context-sensitive help (also try --help-long and --help-man).
-      --nut.server="127.0.0.1"  Hostname or IP address of the server to connect to.' ($NUT_EXPORTER_SERVER)
+  -h, --help                     Show context-sensitive help (also try --help-long and --help-man).
+      --nut.server="127.0.0.1"   Hostname or IP address of the server to connect to. ($NUT_EXPORTER_SERVER)
       --nut.username=NUT.USERNAME
-                                If set, will authenticate with this username to the server. Password must be set in NUT_EXPORTER_PASSWORD environment variable.' ($NUT_EXPORTER_USERNAME)
+                                 If set, will authenticate with this username to the server. Password must be set in NUT_EXPORTER_PASSWORD environment variable. ($NUT_EXPORTER_USERNAME)
+      --nut.disable_device_info  A flag to disable the generation of the device_info meta metric. ($NUT_EXPORTER_DISABLE_DEVICE_INFO)
       --nut.vars_enable="battery.charge,battery.voltage,battery.voltage.nominal,input.voltage,input.voltage.nominal,ups.load,ups.status"
-                                A comma-separated list of variable names to monitor. See the variable notes in README.' ($NUT_EXPORTER_VARIABLES)
+                                 A comma-separated list of variable names to monitor. See the variable notes in README. ($NUT_EXPORTER_VARIABLES)
       --nut.on_regex="^(enable|enabled|on|true|active|activated)$"
-                                This regular expression will be used to determine if the var's value should be coaxed to 1 if it is a string. Match is case-insensitive. ($NUT_EXPORTER_ON_REGEX)
+                                 This regular expression will be used to determine if the var's value should be coaxed to 1 if it is a string. Match is case-insensitive. ($NUT_EXPORTER_ON_REGEX)
       --nut.off_regex="^(disable|disabled|off|false|inactive|deactivated)$"
-                                This regular expression will be used to determine if the var's value should be coaxed to 0 if it is a string. Match is case-insensitive. ($NUT_EXPORTER_OFF_REGEX)
+                                 This regular expression will be used to determine if the var's value should be coaxed to 0 if it is a string. Match is case-insensitive. ($NUT_EXPORTER_OFF_REGEX)
       --nut.statuses="OL,OB,LB,HB,RB,CHRG,DISCHRG,BYPASS,CAL,OFF,OVER,TRIM,BOOST,FSD,SD"
-                                A comma-separated list of statuses labels that will always be set by the exporter. If NUT does not set these flags, the exporter will force the network_ups_tools_ups_status{flag="NAME"} to 0. See the ups.status notes in
-                                README.' ($NUT_EXPORTER_STATUSES)
+                                 A comma-separated list of statuses labels that will always be set by the exporter. If NUT does not set these flags, the exporter will force the network_ups_tools_ups_status{flag="NAME"} to 0. See the ups.status notes in
+                                 README.' ($NUT_EXPORTER_STATUSES)
       --metrics.namespace="network_ups_tools"
-                                Metrics Namespace ($NUT_EXPORTER_METRICS_NAMESPACE)
+                                 Metrics Namespace ($NUT_EXPORTER_METRICS_NAMESPACE)
       --web.listen-address=":9199"
-                                Address to listen on for web interface and telemetry ($NUT_EXPORTER_WEB_LISTEN_ADDRESS)
+                                 Address to listen on for web interface and telemetry ($NUT_EXPORTER_WEB_LISTEN_ADDRESS)
       --web.telemetry-path="/ups_metrics"
-                                Path under which to expose the UPS Prometheus metrics ($NUT_EXPORTER_WEB_TELEMETRY_PATH)
+                                 Path under which to expose the UPS Prometheus metrics ($NUT_EXPORTER_WEB_TELEMETRY_PATH)
       --web.exporter-telemetry-path="/metrics"
-                                Path under which to expose process metrics about this exporter ($NUT_EXPORTER_WEB_EXPORTER_TELEMETRY_PATH)
+                                 Path under which to expose process metrics about this exporter ($NUT_EXPORTER_WEB_EXPORTER_TELEMETRY_PATH)
       --web.auth.username=WEB.AUTH.USERNAME
-                                Username for web interface basic auth ($NUT_EXPORTER_WEB_AUTH_USERNAME)
+                                 Username for web interface basic auth. Password must be set in NUT_EXPORTER_WEB_AUTH_PASSWORD environment variable ($NUT_EXPORTER_WEB_AUTH_USERNAME)
       --web.tls.cert_file=WEB.TLS.CERT_FILE
-                                Path to a file that contains the TLS certificate (PEM format). If the certificate is signed by a certificate authority, the file should be the concatenation of the server's certificate, any intermediates, and the CA's
-                                certificate ($NUT_EXPORTER_WEB_TLS_CERTFILE)
+                                 Path to a file that contains the TLS certificate (PEM format). If the certificate is signed by a certificate authority, the file should be the concatenation of the server's certificate, any intermediates, and the CA's
+                                 certificate ($NUT_EXPORTER_WEB_TLS_CERTFILE)
       --web.tls.key_file=WEB.TLS.KEY_FILE
-                                Path to a file that contains the TLS private key (PEM format) ($NUT_EXPORTER_WEB_TLS_KEYFILE)
-      --printMetrics            Print the metrics this exporter exposes and exits. Default: false ($NUT_EXPORTER_PRINT_METRICS)
-      --log.level=info          Only log messages with the given severity or above. One of: [debug, info, warn, error]
-      --log.format=logfmt       Output format of log messages. One of: [logfmt, json]
-      --version                 Show application version.
+                                 Path to a file that contains the TLS private key (PEM format) ($NUT_EXPORTER_WEB_TLS_KEYFILE)
+      --printMetrics             Print the metrics this exporter exposes and exits. Default: false ($NUT_EXPORTER_PRINT_METRICS)
+      --log.level=info           Only log messages with the given severity or above. One of: [debug, info, warn, error]
+      --log.format=logfmt        Output format of log messages. One of: [logfmt, json]
+      --version                  Show application version.
 ```
 
 &nbsp;
