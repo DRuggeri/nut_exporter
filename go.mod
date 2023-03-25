@@ -1,6 +1,6 @@
 module github.com/DRuggeri/nut_exporter
 
-go 1.19
+go 1.18
 
 require (
 	github.com/alecthomas/kingpin/v2 v2.3.2
