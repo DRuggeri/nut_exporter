@@ -7,7 +7,7 @@ require (
 	github.com/go-kit/log v0.2.1
 	github.com/prometheus/client_golang v1.14.0
 	github.com/prometheus/common v0.41.0
-	github.com/prometheus/exporter-toolkit v0.9.1
+	github.com/prometheus/exporter-toolkit v0.9.2-0.20230325130527-feef77d71811
 	github.com/robbiet480/go.nut v0.0.0-20220219091450-bd8f121e1fa1
 )
 
