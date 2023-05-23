@@ -1,0 +1,13 @@
+{{- if .Values.dashboard.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "nutexporter.name" . }}-dashboards
+  labels:
+    {{- include "nutexporter.labels" . | nindent 4 }}
+    {{- toYaml .Values.dashboard.labels | nindent 4 }}
+data:
+  nutdashboard.json: |-
+    {{ $.Files.Get "dashboards/default.json" | nindent 4 }}
+---
+{{- end }}

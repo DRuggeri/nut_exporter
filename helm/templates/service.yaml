@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    {{- include "nutexporter.labels" . | nindent 4 }}
+  name: {{ include "nutexporter.name" . }}
+spec:
+  clusterIP: None
+  ports:
+  - name: http
+    port: 9199
+    targetPort: http
+  selector:
+    {{- include "nutexporter.selectorLabels" . | nindent 4 }}
