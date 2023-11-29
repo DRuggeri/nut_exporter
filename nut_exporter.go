@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/alecthomas/kingpin/v2"
@@ -25,6 +26,10 @@ var (
 	server = kingpin.Flag(
 		"nut.server", "Hostname or IP address of the server to connect to. ($NUT_EXPORTER_SERVER)",
 	).Envar("NUT_EXPORTER_SERVER").Default("127.0.0.1").String()
+
+	serverport = kingpin.Flag(
+		"nut.serverport", "Port on the NUT server to connect to. ($NUT_EXPORTER_SERVER)",
+	).Envar("NUT_EXPORTER_SERVER").Default("3493").Int()
 
 	nutUsername = kingpin.Flag(
 		"nut.username", "If set, will authenticate with this username to the server. Password must be set in NUT_EXPORTER_PASSWORD environment variable. ($NUT_EXPORTER_USERNAME)",
@@ -89,6 +94,12 @@ func (h *metricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		thisCollectorOpts.Server = r.URL.Query().Get("server")
 	}
 
+	if r.URL.Query().Get("serverport") != "" {
+		if port, err := strconv.Atoi(r.URL.Query().Get("serverport")); err != nil {
+			thisCollectorOpts.ServerPort = port
+		}
+	}
+
 	if r.URL.Query().Get("username") != "" {
 		thisCollectorOpts.Username = r.URL.Query().Get("username")
 	}
@@ -106,7 +117,7 @@ func (h *metricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var promHandler http.Handler
-	cacheName := fmt.Sprintf("%s/%s", thisCollectorOpts.Server, thisCollectorOpts.Ups)
+	cacheName := fmt.Sprintf("%s:%d/%s", thisCollectorOpts.Server, thisCollectorOpts.ServerPort, thisCollectorOpts.Ups)
 	if tmp, ok := h.handlers[cacheName]; ok {
 		level.Debug(logger).Log("msg", fmt.Sprintf("Using existing handler for UPS `%s`", cacheName))
 		promHandler = *tmp
@@ -173,6 +184,7 @@ func main() {
 	collectorOpts = collectors.NutCollectorOpts{
 		Namespace:         *metricsNamespace,
 		Server:            *server,
+		ServerPort:        *serverport,
 		Username:          *nutUsername,
 		Password:          nutPassword,
 		DisableDeviceInfo: *disableDeviceInfo,

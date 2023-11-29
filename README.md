@@ -199,8 +199,10 @@ usage: nut_exporter [<flags>]
 Flags:
   -h, --[no-]help                Show context-sensitive help (also try --help-long and --help-man).
       --nut.server="127.0.0.1"   Hostname or IP address of the server to connect to. ($NUT_EXPORTER_SERVER) ($NUT_EXPORTER_SERVER)
+      --nut.serverport=3493      Port on the NUT server to connect to. ($NUT_EXPORTER_SERVER) ($NUT_EXPORTER_SERVER)
       --nut.username=NUT.USERNAME  
-                                 If set, will authenticate with this username to the server. Password must be set in NUT_EXPORTER_PASSWORD environment variable. ($NUT_EXPORTER_USERNAME) ($NUT_EXPORTER_USERNAME)
+                                 If set, will authenticate with this username to the server. Password must be set in NUT_EXPORTER_PASSWORD environment variable. ($NUT_EXPORTER_USERNAME)
+                                 ($NUT_EXPORTER_USERNAME)
       --[no-]nut.disable_device_info  
                                  A flag to disable the generation of the device_info meta metric. ($NUT_EXPORTER_DISABLE_DEVICE_INFO) ($NUT_EXPORTER_DISABLE_DEVICE_INFO)
       --nut.vars_enable="battery.charge,battery.voltage,battery.voltage.nominal,input.voltage,input.voltage.nominal,ups.load,ups.status"  
@@ -219,7 +221,8 @@ Flags:
       --[no-]web.systemd-socket  Use systemd socket activation listeners instead of port listeners (Linux only).
       --web.listen-address=:9199 ...  
                                  Addresses on which to expose metrics and web interface. Repeatable for multiple addresses.
-      --web.config.file=""       [EXPERIMENTAL] Path to configuration file that can enable TLS or authentication. See: https://github.com/prometheus/exporter-toolkit/blob/master/docs/web-configuration.md
+      --web.config.file=""       [EXPERIMENTAL] Path to configuration file that can enable TLS or authentication. See:
+                                 https://github.com/prometheus/exporter-toolkit/blob/master/docs/web-configuration.md
       --web.telemetry-path="/ups_metrics"  
                                  Path under which to expose the UPS Prometheus metrics ($NUT_EXPORTER_WEB_TELEMETRY_PATH) ($NUT_EXPORTER_WEB_TELEMETRY_PATH)
       --web.exporter-telemetry-path="/metrics"  
