@@ -1,6 +1,6 @@
 ### STAGE 1: Build ###
 
-FROM golang:1-bullseye as builder
+FROM golang:1-alpine as builder
 
 WORKDIR /app
 COPY . /app
