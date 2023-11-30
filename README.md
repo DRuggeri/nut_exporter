@@ -99,7 +99,7 @@ The following query string parameters can be passed to the `/ups_metrics` path:
   * `statuses` - Overrides the command line parameter `--nut.statuses`
 See the example scrape configurations below for how to utilize this capability
 
-### Example Scrape Configurations
+### Example Prometheus Scrape Configurations
 Note that this exporter will scrape only one UPS per scrape invocation. If there are multiple UPS devices visible to NUT, you MUST ensure that you set up different scrape configs for each UPS device. Here is an example configuration for such a use case:
 
 ```
