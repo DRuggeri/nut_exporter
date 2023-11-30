@@ -28,8 +28,8 @@ var (
 	).Envar("NUT_EXPORTER_SERVER").Default("127.0.0.1").String()
 
 	serverport = kingpin.Flag(
-		"nut.serverport", "Port on the NUT server to connect to. ($NUT_EXPORTER_SERVER)",
-	).Envar("NUT_EXPORTER_SERVER").Default("3493").Int()
+		"nut.serverport", "Port on the NUT server to connect to. ($NUT_EXPORTER_SERVERPORT)",
+	).Envar("NUT_EXPORTER_SERVERPORT").Default("3493").Int()
 
 	nutUsername = kingpin.Flag(
 		"nut.username", "If set, will authenticate with this username to the server. Password must be set in NUT_EXPORTER_PASSWORD environment variable. ($NUT_EXPORTER_USERNAME)",
