@@ -199,7 +199,7 @@ usage: nut_exporter [<flags>]
 Flags:
   -h, --[no-]help                Show context-sensitive help (also try --help-long and --help-man).
       --nut.server="127.0.0.1"   Hostname or IP address of the server to connect to. ($NUT_EXPORTER_SERVER) ($NUT_EXPORTER_SERVER)
-      --nut.serverport=3493      Port on the NUT server to connect to. ($NUT_EXPORTER_SERVER) ($NUT_EXPORTER_SERVER)
+      --nut.serverport=3493      Port on the NUT server to connect to. ($NUT_EXPORTER_SERVER) ($NUT_EXPORTER_SERVERPORT)
       --nut.username=NUT.USERNAME  
                                  If set, will authenticate with this username to the server. Password must be set in NUT_EXPORTER_PASSWORD environment variable. ($NUT_EXPORTER_USERNAME)
                                  ($NUT_EXPORTER_USERNAME)
