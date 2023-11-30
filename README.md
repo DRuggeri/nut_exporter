@@ -55,7 +55,7 @@ network_ups_tools_ups_status{flag="OFF"} 0
 network_ups_tools_ups_status{flag="OVER"} 0
 network_ups_tools_ups_status{flag="BOOST"} 0
 network_ups_tools_ups_status{flag="FSD"} 0
-network_ups_tools_ups_status{flag="FD"} 0
+network_ups_tools_ups_status{flag="SD"} 0
 ```
 Because each UPS differs, it is advisable to observe your UPS under various conditions to know which of these statuses will never apply.
 
