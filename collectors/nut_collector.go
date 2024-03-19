@@ -24,6 +24,7 @@ type NutCollector struct {
 type NutCollectorOpts struct {
 	Namespace         string
 	Server            string
+	ServerPort        int
 	Ups               string
 	Username          string
 	Password          string
@@ -81,8 +82,8 @@ func NewNutCollector(opts NutCollectorOpts, logger log.Logger) (*NutCollector, e
 }
 
 func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
-	level.Debug(c.logger).Log("msg", "Connecting to server", "server", c.opts.Server)
-	client, err := nut.Connect(c.opts.Server)
+	level.Debug(c.logger).Log("msg", "Connecting to server", "server", c.opts.Server, "port", c.opts.ServerPort)
+	client, err := nut.Connect(c.opts.Server, c.opts.ServerPort)
 	if err != nil {
 		level.Error(c.logger).Log("err", err)
 		ch <- prometheus.NewInvalidMetric(
