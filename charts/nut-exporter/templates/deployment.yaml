@@ -1,26 +1,37 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "nutexporter.name" . }}
+  name: {{ include "nut-exporter.fullname" . }}
   labels:
-    {{- include "nutexporter.labels" . | nindent 4 }}
+    {{- include "nut-exporter.labels" . | nindent 4 }}
 spec:
-  replicas: 1
-  strategy:
-    type: Recreate
+  replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      {{- include "nutexporter.selectorLabels" . | nindent 6 }}
+      {{- include "nut-exporter.selectorLabels" . | nindent 6 }}
   template:
     metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       labels:
-        {{- include "nutexporter.labels" . | nindent 8 }}
+        {{- include "nut-exporter.labels" . | nindent 8 }}
     spec:
-      hostNetwork: true
+      hostNetwork: {{ .Values.podHostNetwork }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: nut-exporter
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          {{- if .Values.envSecret }}
+          envFrom:
+            - secretRef:
+                name: {{ include "nut-exporter.fullname" . }}-env
+          {{- end }}
           {{- with .Values.env }}
           env:
             {{- toYaml . | nindent 12 }}
@@ -29,32 +40,16 @@ spec:
           args:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          securityContext:
-            privileged: true
           ports:
           - containerPort: 9199
             name: http
             protocol: TCP
           livenessProbe:
-            httpGet:
-              path: /ups_metrics
-              port: http
-            initialDelaySeconds: 10
-            failureThreshold: 5
-            timeoutSeconds: 2
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
           readinessProbe:
-            httpGet:
-              path: /ups_metrics
-              port: http
-            initialDelaySeconds: 10
-            failureThreshold: 5
-            timeoutSeconds: 2
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
           resources:
-            limits:
-              memory: 128Mi
-            requests:
-              cpu: 50m
-              memory: 24Mi
+            {{- toYaml .Values.resources | nindent 12 }}
       {{- with .Values.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}

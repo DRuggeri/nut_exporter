@@ -1,12 +1,13 @@
+{{- if .Values.serviceMonitor.enabled }}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   labels:
-    {{- include "nutexporter.labels" . | nindent 4 }}
+    {{- include "nut-exporter.labels" . | nindent 4 }}
     {{- with .Values.serviceMonitor.labels  }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
-  name: {{ include "nutexporter.name" . }}
+  name: {{ include "nut-exporter.fullname" . }}
   namespace: {{ $.Values.serviceMonitor.namespace }}
 spec:
   endpoints:
@@ -28,4 +29,5 @@ spec:
       - {{ .Release.Namespace }}
   selector:
     matchLabels:
-      {{- include "nutexporter.selectorLabels" . | nindent 6 }}
+      {{- include "nut-exporter.selectorLabels" . | nindent 6 }}
+{{- end }}

@@ -1,7 +1,14 @@
 image:
   repository: ghcr.io/druggeri/nut_exporter
-  tag: "3.0"
-  pullPolicy: Always
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+replicaCount: 1
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
 
 dashboard:
   enabled: true
@@ -9,6 +16,7 @@ dashboard:
     grafana_dashboard: "1"
 
 serviceMonitor:
+  enabled: true
   namespace: monitoring
   labels: {}
     # key: value
@@ -19,8 +27,12 @@ serviceMonitor:
 extraArgs: []
 # - --log.level=debug
 
+envSecret:
+  NUT_EXPORTER_PASSWORD: "mypasswd"
 
-env: 
+env:
+  - name: NUT_EXPORTER_SERVER
+    value: "127.0.0.1"
   - name: NUT_EXPORTER_USERNAME
     value: "admin"
   # - name: NUT_EXPORTER_USERNAME
@@ -28,8 +40,6 @@ env:
   #     secretKeyRef:
   #       name: nut-credentials
   #       key: username
-  - name: NUT_EXPORTER_PASSWORD
-    value: "mypasswd"
   # - name: NUT_EXPORTER_PASSWORD
   #   valueFrom:
   #     secretKeyRef:
@@ -37,8 +47,6 @@ env:
   #       key: password
   # - name: NUT_EXPORTER_VARIABLES
   #   value: "battery.charge,battery.runtime,battery.voltage,battery.voltage.nominal,input.voltage,input.voltage.nominal,ups.load,ups.status"
-  # - name: NUT_EXPORTER_SERVER
-  #   value: "127.0.0.1"
   # - name: NUT_EXPORTER_DISABLE_DEVICE_INFO
   #   value: "false"
   # - name: NUT_EXPORTER_ON_REGEX
@@ -63,6 +71,57 @@ tolerations: []
 # - key: node-role.kubernetes.io/master
 #   operator: "Exists"
 #   effect: NoSchedule
+
+podAnnotations:
+  prometheus.io/scrape: "false"
+  prometheus.io/path: "/ups_metrics"
+  prometheus.io/port: "9199"
+
+podSecurityContext: {}
+  # privileged: true
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+podHostNetwork: false
+
+service:
+  type: ClusterIP
+  port: 9348
+
+livenessProbe:
+  httpGet:
+    path: /ups_metrics
+    port: http
+  initialDelaySeconds: 10
+  failureThreshold: 5
+  timeoutSeconds: 2
+
+readinessProbe:
+  httpGet:
+    path: /ups_metrics
+    port: http
+  initialDelaySeconds: 10
+  failureThreshold: 5
+  timeoutSeconds: 2
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
 
 rules:
   enabled: true
