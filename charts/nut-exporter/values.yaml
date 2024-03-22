@@ -11,13 +11,14 @@ nameOverride: ""
 fullnameOverride: ""
 
 dashboard:
-  enabled: true
+  enabled: false
+  namespace: ""
   labels:
     grafana_dashboard: "1"
 
 serviceMonitor:
-  enabled: true
-  namespace: monitoring
+  enabled: false
+  namespace: ""
   labels: {}
     # key: value
   relabelings: []
@@ -78,10 +79,10 @@ podAnnotations:
   prometheus.io/port: "9199"
 
 podSecurityContext: {}
-  # privileged: true
   # fsGroup: 2000
 
 securityContext: {}
+  # privileged: true
   # capabilities:
   #   drop:
   #   - ALL
@@ -93,7 +94,7 @@ podHostNetwork: false
 
 service:
   type: ClusterIP
-  port: 9348
+  port: 9199
 
 livenessProbe:
   httpGet:
@@ -124,8 +125,8 @@ resources: {}
   #   memory: 128Mi
 
 rules:
-  enabled: true
-  namespace: monitoring
+  enabled: false
+  namespace: ""
   labels: {}
     # key: value
   rules:

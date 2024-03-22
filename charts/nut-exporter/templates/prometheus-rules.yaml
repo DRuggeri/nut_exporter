@@ -8,6 +8,9 @@ metadata:
     {{- with .Values.rules.labels  }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
+  {{- with $.Values.rules.namespace }}
+  namespace: {{ . }}
+  {{- end }}
 spec:
   groups:
   - name: NutExporter

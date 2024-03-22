@@ -8,7 +8,9 @@ metadata:
     {{- toYaml . | nindent 4 }}
     {{- end }}
   name: {{ include "nut-exporter.fullname" . }}
-  namespace: {{ $.Values.serviceMonitor.namespace }}
+  {{- with $.Values.serviceMonitor.namespace }}
+  namespace: {{ . }}
+  {{- end }}
 spec:
   endpoints:
   - interval: 15s
