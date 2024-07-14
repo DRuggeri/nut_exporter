@@ -67,7 +67,7 @@ It is strongly suggested to observe your UPS under both "normal" and "abnormal" 
 As noted above, the UPS status is a special case and is handled with flags set as labels on the `network_ups_tools_ups_status` metric. Therefore, alerting can be configured for specific statuses. Examples:
  * **Alert if the UPS has exited 'online' mode**: `network_ups_tools_ups_status{flag="OL"} == 0`
  * **Alert if the UPS has gone on battery**:  `network_ups_tools_ups_status{flag="OB"} == 1`
- * **Alert if any status changed in the past 5 minutes** changes(network_ups_tools_ups_status[5m])
+ * **Alert if any status changed in the past 5 minutes** `changes(network_ups_tools_ups_status[5m]) > 0`
 
 Unfortunately, the NUT documentation does not call out the full list of statuses each driver implements nor what a user can expect for a status.
 The following values were detected in the [NUT driver documentation](https://github.com/networkupstools/nut/blob/master/docs/new-drivers.txt):
