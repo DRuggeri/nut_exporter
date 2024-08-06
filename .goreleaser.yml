@@ -19,6 +19,7 @@ builds:
       - '386'
       - arm
       - arm64
+      #- riskv64
     ignore:
       - goos: darwin
         goarch: '386'
