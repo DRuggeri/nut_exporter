@@ -51,7 +51,7 @@ jobs:
         with:
           distribution: goreleaser
           version: latest
-          args: build --clean --parallelism=2 --timeout=1h --skip-validate
+          args: build --clean --parallelism=2 --timeout=1h --skip=validate
 
       - name: Publish release
         uses: goreleaser/goreleaser-action@v4
