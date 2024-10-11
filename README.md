@@ -252,3 +252,10 @@ This collector is the workhorse of the exporter. Default metrics are exported fo
   network_ups_tools_device_info - UPS device information
   network_ups_tools_VARIABLE_NAME - Variable from Network UPS Tools as noted in the variable notes above
 ```
+
+## Helm Chart
+To install the [Helm](https://helm.sh/docs/) chart into a Kubernetes cluster run:
+```sh
+helm repo add nut-exporter https://github.com/DRuggeri/nut_exporter
+helm install nut-exporter/nut-exporter nut-exporter
+```
