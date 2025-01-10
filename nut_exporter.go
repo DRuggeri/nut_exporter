@@ -162,13 +162,23 @@ func main() {
 	}
 
 	variables := []string{}
+	hasUpsStatusVariable := false
 	for _, varName := range strings.Split(*enableFilter, ",") {
 		// Be nice and clear spaces for those that like them
 		variable := strings.Trim(varName, " ")
 		if variable == "" {
 			continue
 		}
-		variables = append(variables, strings.Trim(varName, " "))
+		variables = append(variables, variable)
+
+		// Special handling because this is an important and commonly needed variable
+		if variable == "ups.status" {
+			hasUpsStatusVariable = true
+		}
+	}
+
+	if !hasUpsStatusVariable {
+		level.Warn(logger).Log("msg", "Exporter has been started without `ups.status` variable to be exported with --nut.vars_enable. Online/offline/etc statuses will not be reported!")
 	}
 
 	statuses := []string{}

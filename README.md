@@ -91,7 +91,7 @@ Therefore, these are all enabled in the default value for `--nut.statuses`.
 The exporter allows for per-scrape overrides of command line parameters by passing query string parameters. This enables a single nut_exporter to scrape multiple NUT servers
 
 The following query string parameters can be passed to the `/ups_metrics` path:
-  * `ups` - Required if more than one UPS is present in NUT)
+  * `ups` - Required if more than one UPS is present in NUT
   * `server` - Overrides the command line parameter `--nut.server`
   * `username` - Overrides the command line parameter `--nut.username`
   * `password` - Overrides the environment variable NUT_EXPORTER_PASSWORD. It is **strongly** recommended to avoid passing credentials over http unless the exporter is configured with TLS
