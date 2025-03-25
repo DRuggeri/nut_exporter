@@ -1,0 +1,35 @@
+{{- if .Values.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    {{- include "nut-exporter.labels" . | nindent 4 }}
+    {{- with .Values.serviceMonitor.labels  }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  name: {{ include "nut-exporter.fullname" . }}
+  {{- with $.Values.serviceMonitor.namespace }}
+  namespace: {{ . }}
+  {{- end }}
+spec:
+  endpoints:
+  - interval: 15s
+    {{- with $.Values.serviceMonitor.metricRelabelings }}
+    metricRelabelings:
+      {{ toYaml . | nindent 6}}
+    {{- end }}
+    {{- with $.Values.serviceMonitor.relabelings }}
+    relabelings:
+      {{ toYaml . | nindent 6}}
+    {{- end }}
+    path: /ups_metrics
+    port: http
+    scheme: http
+  jobLabel: nut-exporter
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+  selector:
+    matchLabels:
+      {{- include "nut-exporter.selectorLabels" . | nindent 6 }}
+{{- end }}

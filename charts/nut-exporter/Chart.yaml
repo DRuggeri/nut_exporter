@@ -1,0 +1,7 @@
+apiVersion: v1
+description: Installs NUT exporter in kubernetes
+name: nut-exporter
+version: 1.0.0
+appVersion: "3.1"
+sources:
+  - https://github.com/DRuggeri/nut_exporter
