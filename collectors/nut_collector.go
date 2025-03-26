@@ -2,11 +2,10 @@ package collectors
 
 import (
 	"fmt"
+	"log/slog"
 	"regexp"
 	"strings"
 
-	"github.com/go-kit/log"
-	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 	nut "github.com/robbiet480/go.nut"
 )
@@ -15,7 +14,7 @@ var deviceLabels = []string{"model", "mfr", "serial", "type", "description", "co
 
 type NutCollector struct {
 	deviceDesc *prometheus.Desc
-	logger     log.Logger
+	logger     *slog.Logger
 	opts       *NutCollectorOpts
 	onRegex    *regexp.Regexp
 	offRegex   *regexp.Regexp
@@ -35,7 +34,7 @@ type NutCollectorOpts struct {
 	DisableDeviceInfo bool
 }
 
-func NewNutCollector(opts NutCollectorOpts, logger log.Logger) (*NutCollector, error) {
+func NewNutCollector(opts NutCollectorOpts, logger *slog.Logger) (*NutCollector, error) {
 	deviceDesc := prometheus.NewDesc(prometheus.BuildFQName(opts.Namespace, "", "device_info"),
 		"UPS Device information",
 		deviceLabels, nil,
@@ -72,20 +71,21 @@ func NewNutCollector(opts NutCollectorOpts, logger log.Logger) (*NutCollector, e
 	if opts.Ups != "" {
 		valid, err := collector.IsValidUPSName(opts.Ups)
 		if err != nil {
-			level.Warn(logger).Log("msg", "Error detected while verifying UPS name - proceeding without validation", "error", err)
+			logger.Warn("Error detected while verifying UPS name - proceeding without validation", "error", err)
 		} else if !valid {
 			return nil, fmt.Errorf("%s UPS is not a valid name in the NUT server %s", opts.Ups, opts.Server)
 		}
 	}
 
+	logger.Info("collector configured", "variables", strings.Join(collector.opts.Variables, ","))
 	return collector, nil
 }
 
 func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
-	level.Debug(c.logger).Log("msg", "Connecting to server", "server", c.opts.Server, "port", c.opts.ServerPort)
+	c.logger.Debug("Connecting to server", "server", c.opts.Server, "port", c.opts.ServerPort)
 	client, err := nut.Connect(c.opts.Server, c.opts.ServerPort)
 	if err != nil {
-		level.Error(c.logger).Log("err", err)
+		c.logger.Error("failed connecting to server", "err", err)
 		ch <- prometheus.NewInvalidMetric(
 			prometheus.NewDesc(prometheus.BuildFQName(c.opts.Namespace, "", "error"),
 				"Failure gathering UPS variables", nil, nil),
@@ -94,14 +94,14 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 
 	defer client.Disconnect()
-	level.Debug(c.logger).Log("msg", "Connected to server", "server", c.opts.Server)
+	c.logger.Debug("Connected to server", "server", c.opts.Server)
 
 	if c.opts.Username != "" && c.opts.Password != "" {
 		_, err = client.Authenticate(c.opts.Username, c.opts.Password)
 		if err == nil {
-			level.Debug(c.logger).Log("msg", "Authenticated", "server", c.opts.Server, "user", c.opts.Username)
+			c.logger.Debug("Authenticated", "server", c.opts.Server, "user", c.opts.Username)
 		} else {
-			level.Warn(c.logger).Log("msg", "Failed to authenticate to NUT server", "server", c.opts.Server, "user", c.opts.Username)
+			c.logger.Warn("Failed to authenticate to NUT server", "server", c.opts.Server, "user", c.opts.Username)
 			//Don't bail after logging the warning. Most NUT configurations do not require authn to read variables
 		}
 	}
@@ -110,10 +110,10 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 	if c.opts.Ups != "" {
 		ups, err := nut.NewUPS(c.opts.Ups, &client)
 		if err == nil {
-			level.Debug(c.logger).Log("msg", "Instantiated UPS", "name", c.opts.Ups)
+			c.logger.Debug("Instantiated UPS", "name", c.opts.Ups)
 			upsList = append(upsList, ups)
 		} else {
-			level.Error(c.logger).Log("msg", "Failure instantiating the UPS", "name", c.opts.Ups, "err", err)
+			c.logger.Error("Failure instantiating the UPS", "name", c.opts.Ups, "err", err)
 			ch <- prometheus.NewInvalidMetric(
 				prometheus.NewDesc(prometheus.BuildFQName(c.opts.Namespace, "", "error"),
 					"Failure instantiating the UPS", nil, nil),
@@ -123,13 +123,13 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 	} else {
 		tmp, err := client.GetUPSList()
 		if err == nil {
-			level.Debug(c.logger).Log("msg", "Obtained list of UPS devices")
+			c.logger.Debug("Obtained list of UPS devices")
 			upsList = tmp
 			for _, ups := range tmp {
-				level.Debug(c.logger).Log("msg", "UPS name detection", "name", ups.Name)
+				c.logger.Debug("UPS name detection", "name", ups.Name)
 			}
 		} else {
-			level.Error(c.logger).Log("msg", "Failure getting the list of UPS devices", "err", err)
+			c.logger.Error("Failure getting the list of UPS devices", "err", err)
 			ch <- prometheus.NewInvalidMetric(
 				prometheus.NewDesc(prometheus.BuildFQName(c.opts.Namespace, "", "error"),
 					"Failure getting the list of UPS devices", nil, nil),
@@ -139,9 +139,9 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 
 	if len(upsList) > 1 {
-		level.Error(c.logger).Log("msg", "Multiple UPS devices were found by NUT for this scrape. For this configuration, you MUST scrape this exporter with a query string parameter indicating which UPS to scrape. Valid values of ups are:")
+		c.logger.Error("Multiple UPS devices were found by NUT for this scrape. For this configuration, you MUST scrape this exporter with a query string parameter indicating which UPS to scrape. Valid values of ups are:")
 		for _, ups := range upsList {
-			level.Error(c.logger).Log("name", ups.Name)
+			c.logger.Error(ups.Name)
 		}
 		ch <- prometheus.NewInvalidMetric(
 			prometheus.NewDesc(prometheus.BuildFQName(c.opts.Namespace, "", "error"),
@@ -159,21 +159,21 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 			device[label] = ""
 		}
 
-		level.Debug(c.logger).Log(
-			"msg", "UPS info",
+		c.logger.Debug(
+			"UPS info",
 			"name", ups.Name,
 			"description", ups.Description,
 			"master", ups.Master,
 			"nmumber_of_logins", ups.NumberOfLogins,
 		)
 		for i, clientName := range ups.Clients {
-			level.Debug(c.logger).Log("client", i, "name", clientName)
+			c.logger.Debug(fmt.Sprintf("client %d", i), "name", clientName)
 		}
 		for _, command := range ups.Commands {
-			level.Debug(c.logger).Log("command", command.Name, "description", command.Description)
+			c.logger.Debug("ups command", "command", command.Name, "description", command.Description)
 		}
 		for _, variable := range ups.Variables {
-			level.Debug(c.logger).Log(
+			c.logger.Debug(
 				"variable_name", variable.Name,
 				"value", variable.Value,
 				"type", variable.Type,
@@ -189,7 +189,7 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 
 			/* Done special processing - now get as general as possible and gather all requested or number-like metrics */
 			if len(c.opts.Variables) == 0 || sliceContains(c.opts.Variables, variable.Name) {
-				level.Debug(c.logger).Log("msg", "Export the variable? true")
+				c.logger.Debug("Export the variable? true")
 				value := float64(0)
 
 				/* Deal with ups.status specially because it is a collection of 'flags' */
@@ -241,18 +241,18 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 					   if this string could possible represent a binary value
 					*/
 					if c.onRegex != nil && c.onRegex.MatchString(variable.Value.(string)) {
-						level.Debug(c.logger).Log("msg", "Converted string to 1 due to regex match", "value", variable.Value.(string))
+						c.logger.Debug("Converted string to 1 due to regex match", "value", variable.Value.(string))
 						value = float64(1)
 					} else if c.offRegex != nil && c.offRegex.MatchString(variable.Value.(string)) {
-						level.Debug(c.logger).Log("msg", "Converted string to 0 due to regex match", "value", variable.Value.(string))
+						c.logger.Debug("Converted string to 0 due to regex match", "value", variable.Value.(string))
 						value = float64(0)
 					} else {
-						level.Debug(c.logger).Log("msg", "Cannot convert string to binary 0/1", "value", variable.Value.(string))
+						c.logger.Debug("Cannot convert string to binary 0/1", "value", variable.Value.(string))
 						continue
 					}
 					continue
 				default:
-					level.Warn(c.logger).Log("Unknown variable type from nut client library", "name", variable.Name, "type", fmt.Sprintf("%T", v), "claimed_type", variable.Type, "value", v)
+					c.logger.Warn("Unknown variable type from nut client library", "name", variable.Name, "type", fmt.Sprintf("%T", v), "claimed_type", variable.Type, "value", v)
 					continue
 				}
 
@@ -266,7 +266,7 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 
 				ch <- prometheus.MustNewConstMetric(varDesc, prometheus.GaugeValue, value)
 			} else {
-				level.Debug(c.logger).Log("msg", "Export the variable? false", "count", len(c.opts.Variables), "variables", c.opts.Variables)
+				c.logger.Debug("Export the variable? false", "count", len(c.opts.Variables), "variables", strings.Join(c.opts.Variables, ","))
 			}
 		}
 
@@ -299,10 +299,10 @@ func sliceContains(c []string, value string) bool {
 func (c *NutCollector) IsValidUPSName(upsName string) (bool, error) {
 	result := false
 
-	level.Debug(c.logger).Log("msg", fmt.Sprintf("Connecting to server and verifying `%s` is a valid UPS name", upsName), "server", c.opts.Server)
+	c.logger.Debug(fmt.Sprintf("Connecting to server and verifying `%s` is a valid UPS name", upsName), "server", c.opts.Server)
 	client, err := nut.Connect(c.opts.Server)
 	if err != nil {
-		level.Error(c.logger).Log("err", err)
+		c.logger.Error("error while connecting to server", "err", err)
 		return result, err
 	}
 
@@ -311,24 +311,24 @@ func (c *NutCollector) IsValidUPSName(upsName string) (bool, error) {
 	if c.opts.Username != "" && c.opts.Password != "" {
 		_, err = client.Authenticate(c.opts.Username, c.opts.Password)
 		if err != nil {
-			level.Warn(c.logger).Log("msg", "Failed to authenticate to NUT server", "server", c.opts.Server, "user", c.opts.Username)
+			c.logger.Warn("Failed to authenticate to NUT server", "server", c.opts.Server, "user", c.opts.Username)
 			//Don't bail after logging the warning. Most NUT configurations do not require authn to get the UPS list
 		}
 	}
 
 	tmp, err := client.GetUPSList()
 	if err != nil {
-		level.Error(c.logger).Log("msg", "Failure getting the list of UPS devices", "err", err)
+		c.logger.Error("Failure getting the list of UPS devices", "err", err)
 		return result, err
 	}
 
 	for _, ups := range tmp {
-		level.Debug(c.logger).Log("msg", "UPS name detection", "name", ups.Name)
+		c.logger.Debug("UPS name detection", "name", ups.Name)
 		if ups.Name == upsName {
 			result = true
 		}
 	}
 
-	level.Debug(c.logger).Log("msg", fmt.Sprintf("Validity result for UPS named `%s`", upsName), "valid", result)
+	c.logger.Debug(fmt.Sprintf("Validity result for UPS named `%s`", upsName), "valid", result)
 	return result, nil
 }

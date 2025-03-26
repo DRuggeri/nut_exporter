@@ -2,18 +2,17 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
 
 	"github.com/alecthomas/kingpin/v2"
-	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/prometheus/common/promlog"
-	"github.com/prometheus/common/promlog/flag"
-	"github.com/prometheus/common/version"
+
+	promcollectors "github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/exporter-toolkit/web"
 	"github.com/prometheus/exporter-toolkit/web/kingpinflag"
 
@@ -73,13 +72,21 @@ var (
 	printMetrics = kingpin.Flag(
 		"printMetrics", "Print the metrics this exporter exposes and exits. Default: false ($NUT_EXPORTER_PRINT_METRICS)",
 	).Envar("NUT_EXPORTER_PRINT_METRICS").Default("false").Bool()
+
+	logLevel = kingpin.Flag(
+		"log.level", "Minimum log level for messages. One of error, warn, info, or debug. Default: info ($NETGEAR_EXPORTER_LOG_LEVEL)",
+	).Envar("NUT_EXPORTER__LOG_LEVEL").Default("info").String()
+
+	logJson = kingpin.Flag(
+		"log.json", "Format log lines as JSON. Default: false ($NETGEAR_EXPORTER_LOG_JSON)",
+	).Envar("NUT_EXPORTER__LOG_JSON").Bool()
 )
 var collectorOpts collectors.NutCollectorOpts
 
-var logger = promlog.New(&promlog.Config{})
+var logger = slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 func init() {
-	prometheus.MustRegister(version.NewCollector(*metricsNamespace))
+	prometheus.MustRegister(promcollectors.NewBuildInfoCollector())
 }
 
 type metricsHandler struct {
@@ -119,11 +126,11 @@ func (h *metricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var promHandler http.Handler
 	cacheName := fmt.Sprintf("%s:%d/%s", thisCollectorOpts.Server, thisCollectorOpts.ServerPort, thisCollectorOpts.Ups)
 	if tmp, ok := h.handlers[cacheName]; ok {
-		level.Debug(logger).Log("msg", fmt.Sprintf("Using existing handler for UPS `%s`", cacheName))
+		logger.Debug(fmt.Sprintf("Using existing handler for UPS `%s`", cacheName))
 		promHandler = *tmp
 	} else {
 		//Build a custom registry to include only the UPS metrics on the UPS metrics path
-		level.Info(logger).Log("msg", fmt.Sprintf("Creating new registry, handler, and collector for UPS `%s`", cacheName))
+		logger.Info(fmt.Sprintf("Creating new registry, handler, and collector for UPS `%s`", cacheName))
 		registry := prometheus.NewRegistry()
 		promHandler = promhttp.HandlerFor(registry, promhttp.HandlerOpts{Registry: registry})
 		promHandler = promhttp.InstrumentMetricHandler(registry, promHandler)
@@ -132,7 +139,7 @@ func (h *metricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte("500 - InternalServer Error"))
-			level.Error(logger).Log("msg", "Internal server error", "err", err)
+			logger.Error("Internal server error", "err", err)
 			return
 		}
 		registry.MustRegister(nutCollector)
@@ -143,20 +150,36 @@ func (h *metricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	promlogConfig := &promlog.Config{}
-	flag.AddFlags(kingpin.CommandLine, promlogConfig)
+	//flag.AddFlags(kingpin.CommandLine, promlogConfig)
 	kingpin.Version(Version)
 	kingpin.HelpFlag.Short('h')
 	kingpin.Parse()
 
 	/* Reconfigure logger after parsing arguments */
-	logger = promlog.New(promlogConfig)
+	opts := &slog.HandlerOptions{}
+	switch *logLevel {
+	case "error":
+		opts.Level = slog.LevelError
+	case "warn":
+		opts.Level = slog.LevelWarn
+	case "info":
+		opts.Level = slog.LevelInfo
+	case "debug":
+		opts.Level = slog.LevelDebug
+	}
+	if *logJson {
+		logger = slog.New(slog.NewJSONHandler(os.Stderr, opts))
+		slog.SetDefault(logger)
+	} else {
+		logger = slog.New(slog.NewTextHandler(os.Stderr, opts))
+		slog.SetDefault(logger)
+	}
 
 	if *nutUsername != "" {
-		level.Info(logger).Log("msg", "Authenticating to NUT server")
+		logger.Debug("Authenticating to NUT server")
 		nutPassword = os.Getenv("NUT_EXPORTER_PASSWORD")
 		if nutPassword == "" {
-			level.Error(logger).Log("msg", "Username set, but NUT_EXPORTER_PASSWORD environment variable missing. Cannot authenticate!")
+			logger.Error("Username set, but NUT_EXPORTER_PASSWORD environment variable missing. Cannot authenticate!")
 			os.Exit(2)
 		}
 	}
@@ -178,7 +201,7 @@ func main() {
 	}
 
 	if !hasUpsStatusVariable {
-		level.Warn(logger).Log("msg", "Exporter has been started without `ups.status` variable to be exported with --nut.vars_enable. Online/offline/etc statuses will not be reported!")
+		logger.Warn("Exporter has been started without `ups.status` variable to be exported with --nut.vars_enable. Online/offline/etc statuses will not be reported!")
 	}
 
 	statuses := []string{}
@@ -233,7 +256,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	level.Info(logger).Log("msg", "Starting nut_exporter", "version", Version)
+	logger.Info("Starting nut_exporter", "version", Version)
 
 	handler := &metricsHandler{
 		handlers: make(map[string]*http.Handler),
@@ -254,7 +277,7 @@ func main() {
 
 	srv := &http.Server{}
 	if err := web.ListenAndServe(srv, tookitFlags, logger); err != nil {
-		level.Error(logger).Log("err", err)
+		logger.Error(err.Error())
 		os.Exit(1)
 	}
 }
