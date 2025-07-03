@@ -173,7 +173,7 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 			c.logger.Debug("ups command", "command", command.Name, "description", command.Description)
 		}
 		for _, variable := range ups.Variables {
-			c.logger.Debug(
+			c.logger.Debug("variable dump",
 				"variable_name", variable.Name,
 				"value", variable.Value,
 				"type", variable.Type,
