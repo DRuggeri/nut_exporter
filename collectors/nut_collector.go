@@ -174,7 +174,7 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 		}
 		for _, variable := range ups.Variables {
 			c.logger.Debug(
-				"variable dump",
+				"Variable dump",
 				"variable_name", variable.Name,
 				"value", variable.Value,
 				"type", variable.Type,
@@ -260,11 +260,13 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 				name := strings.ReplaceAll(variable.Name, ".", "_")
 				name = strings.ReplaceAll(name, "-", "_")
 
-				varDesc := prometheus.NewDesc(prometheus.BuildFQName(c.opts.Namespace, "", name),
+				fqName := prometheus.BuildFQName(c.opts.Namespace, "", name)
+				varDesc := prometheus.NewDesc(fqName,
 					fmt.Sprintf("%s (%s)", variable.Description, variable.Name),
 					nil, nil,
 				)
 
+				c.logger.Debug("Collecting as prometheus metric", "name", fqName, "value", value)
 				ch <- prometheus.MustNewConstMetric(varDesc, prometheus.GaugeValue, value)
 			} else {
 				c.logger.Debug("Export the variable? false", "count", len(c.opts.Variables), "variables", strings.Join(c.opts.Variables, ","))
