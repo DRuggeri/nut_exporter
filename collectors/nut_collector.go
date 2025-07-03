@@ -173,7 +173,8 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 			c.logger.Debug("ups command", "command", command.Name, "description", command.Description)
 		}
 		for _, variable := range ups.Variables {
-			c.logger.Debug("variable dump",
+			c.logger.Debug(
+				"variable dump",
 				"variable_name", variable.Name,
 				"value", variable.Value,
 				"type", variable.Type,
@@ -256,8 +257,8 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 					continue
 				}
 
-				name := strings.Replace(variable.Name, ".", "_", -1)
-				name = strings.Replace(name, "-", "_", -1)
+				name := strings.ReplaceAll(variable.Name, ".", "_")
+				name = strings.ReplaceAll(name, "-", "_")
 
 				varDesc := prometheus.NewDesc(prometheus.BuildFQName(c.opts.Namespace, "", name),
 					fmt.Sprintf("%s (%s)", variable.Description, variable.Name),
