@@ -1,4 +1,4 @@
-module github.com/DRuggeri/nut_exporter
+module github.com/DRuggeri/nut_exporter/v3
 
 go 1.22
 
