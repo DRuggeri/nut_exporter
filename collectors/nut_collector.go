@@ -251,7 +251,6 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 						c.logger.Debug("Cannot convert string to binary 0/1", "value", variable.Value.(string))
 						continue
 					}
-					continue
 				default:
 					c.logger.Warn("Unknown variable type from nut client library", "name", variable.Name, "type", fmt.Sprintf("%T", v), "claimed_type", variable.Type, "value", v)
 					continue
