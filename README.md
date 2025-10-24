@@ -175,7 +175,7 @@ $ ./nut_exporter <flags>
 Using the standard `go install` (you must have [Go](https://golang.org/) already installed in your local machine):
 
 ```bash
-$ go install github.com/DRuggeri/nut_exporter
+$ go install github.com/DRuggeri/nut_exporter/v3@latest
 $ nut_exporter <flags>
 ```
 

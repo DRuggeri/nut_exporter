@@ -16,7 +16,7 @@ import (
 	"github.com/prometheus/exporter-toolkit/web"
 	"github.com/prometheus/exporter-toolkit/web/kingpinflag"
 
-	"github.com/DRuggeri/nut_exporter/collectors"
+	"github.com/DRuggeri/nut_exporter/v3/collectors"
 )
 
 var Version = "testing"
