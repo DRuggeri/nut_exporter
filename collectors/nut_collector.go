@@ -148,7 +148,7 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 				"Multiple UPS devices were found from NUT. Please add a ups=<name> query string", nil, nil),
 			err)
 		return
-	} else {
+	} else if len(upsList) == 1 {
 		//Set the name so subsequent scrapes don't have to look it up
 		c.opts.Ups = upsList[0].Name
 	}
