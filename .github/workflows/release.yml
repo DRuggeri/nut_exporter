@@ -75,11 +75,8 @@ jobs:
           export PROJECT_NAME=${GITHUB_REPOSITORY##*/}
           export TAG=${GITHUB_REF##*/}
 
-          echo "PROJECT_NAME=$PROJECT_NAME" >> $GITHUB_ENV
-          echo "TAG=$TAG" >> $GITHUB_ENV
-          echo "URL_LINUX_AMD64=https://github.com/${GITHUB_REPOSITORY}/releases/download/$TAG/${PROJECT_NAME}-${TAG}-linux-amd64" >> $GITHUB_ENV
-          echo "URL_LINUX_ARM64=https://github.com/${GITHUB_REPOSITORY}/releases/download/$TAG/${PROJECT_NAME}-${TAG}-linux-arm64" >> $GITHUB_ENV
-          echo "URL_LINUX_ARM=https://github.com/${GITHUB_REPOSITORY}/releases/download/$TAG/${PROJECT_NAME}-${TAG}-linux-arm" >> $GITHUB_ENV
+          echo "PROJECT_NAME=$PROJECT_NAME" >>$GITHUB_ENV
+          echo "TAG=$TAG" >>$GITHUB_ENV
 
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -115,26 +112,6 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=sha
-
-      - name: Create scratch docker image
-        run: |
-          echo "
-          FROM alpine AS builder
-          RUN apk --no-cache add wget ca-certificates \
-           && if uname -m | grep 'x86_64' >/dev/null 2>&1; then wget -O /downloaded_file $URL_LINUX_AMD64;fi \
-           && if uname -m | grep 'aarch64' >/dev/null 2>&1; then wget -O /downloaded_file $URL_LINUX_ARM64;fi \
-           && if uname -m | grep 'arm' >/dev/null 2>&1; then wget -O /downloaded_file $URL_LINUX_ARM;fi \
-           && if [ ! -f /downloaded_file ];then echo "===Failed to download for:";uname -m;echo "===";exit 1;fi \
-           && chmod 755 /downloaded_file
-
-          FROM scratch
-          COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
-          COPY --from=builder /downloaded_file /$PROJECT_NAME
-          ENTRYPOINT [\"/$PROJECT_NAME\"]
-          " > Dockerfile
-
-          echo "Rendered Dockerfile in $PWD:"
-          cat Dockerfile
 
       - name: Build and push Docker images
         uses: docker/build-push-action@v4
