@@ -1,3 +1,5 @@
+# Common workflow for DRuggeri's repos
+
 name: Release
 on:
   - push
@@ -34,6 +36,8 @@ jobs:
   release:
     needs: test
     name: Build and release
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -67,6 +71,8 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: release
     name: Push containers
+    permissions:
+      packages: write
     runs-on: ubuntu-latest
     steps:
       - name: Prep variables
@@ -116,8 +122,10 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=sha
 
-      - name: Create scratch docker image
+      - name: Create Dockerfile if missing
         run: |
+          test -f Dockerfile && exit 0
+
           echo "
           FROM alpine AS builder
           RUN apk --no-cache add wget ca-certificates \
