@@ -27,7 +27,7 @@ builds:
         goarch: '386'
 
 archives:
-  - format: binary
+  - formats: [ binary ]
     name_template: "{{ .ProjectName }}-v{{ .Version }}-{{ .Os }}-{{ .Arch }}"
 release:
   draft: false
