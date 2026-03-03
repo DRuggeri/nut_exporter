@@ -4,13 +4,14 @@
 usage (){
 echo "$0 - Tag and prepare a release
 
-USAGE: $0 (major|minor|patch|vX.Y.Z)
+USAGE: $0 (major|minor|patch|vX.Y.Z[-SUFFIX])
 
 The argument may be one of:
 major  - Increments the current major version and performs the release
 minor  - Increments the current minor version and preforms the release
 patch  - Increments the current patch version and preforms the release
 vX.Y.Z - Sets the tag to the value of vX.Y.Z where X=major, Y=minor, and Z=patch
+vX.Y.Z-SUFFIX - Sets the tag with a pre-release suffix (e.g., v3.0.0-rc1, v3.0.0-beta1)
 "
   exit 1
 }
