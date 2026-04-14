@@ -8,7 +8,7 @@ require (
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/prometheus/client_golang v1.20.4
 	github.com/prometheus/exporter-toolkit v0.14.0
-	github.com/robbiet480/go.nut v0.0.0-20220219091450-bd8f121e1fa1
+	github.com/robbiet480/go.nut v0.0.0-20240622015809-60e196249c53
 )
 
 require (
