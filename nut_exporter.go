@@ -1,18 +1,21 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	promcollectors "github.com/prometheus/client_golang/prometheus/collectors"
+	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/exporter-toolkit/web"
 	"github.com/prometheus/exporter-toolkit/web/kingpinflag"
 
@@ -55,6 +58,10 @@ var (
 		"nut.statuses", "A comma-separated list of statuses labels that will always be set by the exporter. If NUT does not set these flags, the exporter will force the network_ups_tools_ups_status{flag=\"NAME\"} to 0. See the ups.status notes in README.' ($NUT_EXPORTER_STATUSES)",
 	).Envar("NUT_EXPORTER_STATUSES").Default("OL,OB,LB,HB,RB,CHRG,DISCHRG,BYPASS,CAL,OFF,OVER,TRIM,BOOST,FSD,SD").String()
 
+	scrapeTimeout = kingpin.Flag(
+		"nut.scrape_timeout", "Overall budget for a single NUT scrape, covering dialing, the handshake, all I/O, and cleanup. Keep the Prometheus scrape_timeout larger than this value. ($NUT_EXPORTER_SCRAPE_TIMEOUT)",
+	).Envar("NUT_EXPORTER_SCRAPE_TIMEOUT").Default("10s").Duration()
+
 	metricsNamespace = kingpin.Flag(
 		"metrics.namespace", "Metrics Namespace ($NUT_EXPORTER_METRICS_NAMESPACE)",
 	).Envar("NUT_EXPORTER_METRICS_NAMESPACE").Default("network_ups_tools").String()
@@ -89,12 +96,46 @@ func init() {
 	prometheus.MustRegister(promcollectors.NewBuildInfoCollector())
 }
 
+// instrumentationRegistry keeps the promhttp_metric_handler_* counters
+// cumulative across scrapes. Per-target registries are created per request, so
+// instrumenting those would reset the counters on every scrape.
+var instrumentationRegistry = prometheus.NewRegistry()
+
+// reRegistering wraps a Registerer so repeated instrumentation of freshly
+// built handlers reuses the already registered metric families instead of
+// panicking on duplicate registration.
+type reRegistering struct {
+	prometheus.Registerer
+}
+
+func (r reRegistering) MustRegister(cs ...prometheus.Collector) {
+	for _, c := range cs {
+		if err := r.Register(c); err != nil {
+			if _, ok := err.(prometheus.AlreadyRegisteredError); !ok {
+				panic(err)
+			}
+		}
+	}
+}
+
 type metricsHandler struct {
-	handlers map[string]*http.Handler
+	opts         collectors.NutCollectorOpts
+	timeout      time.Duration
+	instrumented http.Handler
+}
+
+func newMetricsHandler(opts collectors.NutCollectorOpts, timeout time.Duration) *metricsHandler {
+	h := &metricsHandler{opts: opts, timeout: timeout}
+	h.instrumented = promhttp.InstrumentMetricHandler(reRegistering{instrumentationRegistry}, http.HandlerFunc(h.serveScrape))
+	return h
 }
 
 func (h *metricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	thisCollectorOpts := collectorOpts
+	h.instrumented.ServeHTTP(w, r)
+}
+
+func (h *metricsHandler) serveScrape(w http.ResponseWriter, r *http.Request) {
+	thisCollectorOpts := h.opts
 	thisCollectorOpts.Ups = r.URL.Query().Get("ups")
 
 	if r.URL.Query().Get("server") != "" {
@@ -102,9 +143,12 @@ func (h *metricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.URL.Query().Get("serverport") != "" {
-		if port, err := strconv.Atoi(r.URL.Query().Get("serverport")); err != nil {
-			thisCollectorOpts.ServerPort = port
+		port, err := strconv.Atoi(r.URL.Query().Get("serverport"))
+		if err != nil || port < 1 || port > 65535 {
+			http.Error(w, fmt.Sprintf("invalid serverport %q", r.URL.Query().Get("serverport")), http.StatusBadRequest)
+			return
 		}
+		thisCollectorOpts.ServerPort = port
 	}
 
 	if r.URL.Query().Get("username") != "" {
@@ -123,30 +167,37 @@ func (h *metricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		thisCollectorOpts.Statuses = strings.Split(r.URL.Query().Get("statuses"), ",")
 	}
 
-	var promHandler http.Handler
-	cacheName := fmt.Sprintf("%s:%d/%s", thisCollectorOpts.Server, thisCollectorOpts.ServerPort, thisCollectorOpts.Ups)
-	if tmp, ok := h.handlers[cacheName]; ok {
-		logger.Debug(fmt.Sprintf("Using existing handler for UPS `%s`", cacheName))
-		promHandler = *tmp
-	} else {
-		//Build a custom registry to include only the UPS metrics on the UPS metrics path
-		logger.Info(fmt.Sprintf("Creating new registry, handler, and collector for UPS `%s`", cacheName))
-		registry := prometheus.NewRegistry()
-		promHandler = promhttp.HandlerFor(registry, promhttp.HandlerOpts{Registry: registry})
-		promHandler = promhttp.InstrumentMetricHandler(registry, promHandler)
+	// The scrape is bounded by the caller: the request context (cancellation
+	// included) and the configured overall budget. Every collector, registry,
+	// and connection used for this scrape is owned by this request, so
+	// credentials and filters can never leak into another scrape's config.
+	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+	defer cancel()
+	thisCollectorOpts.Context = ctx
 
-		nutCollector, err := collectors.NewNutCollector(thisCollectorOpts, logger)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte("500 - InternalServer Error"))
-			logger.Error("Internal server error", "err", err)
-			return
-		}
-		registry.MustRegister(nutCollector)
-		h.handlers[cacheName] = &promHandler
+	registry := prometheus.NewRegistry()
+	nutCollector, err := collectors.NewNutCollector(thisCollectorOpts, logger)
+	if err != nil {
+		http.Error(w, "500 - InternalServer Error", http.StatusInternalServerError)
+		logger.Error("Internal server error", "err", err)
+		return
 	}
+	registry.MustRegister(nutCollector)
 
-	promHandler.ServeHTTP(w, r)
+	// Never answer a scrape whose budget expired mid-flight with a 200
+	// carrying a partially gathered metric set.
+	gatherer := prometheus.GathererFunc(func() ([]*dto.MetricFamily, error) {
+		metrics, err := registry.Gather()
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		if deadline, ok := ctx.Deadline(); ok && !time.Now().Before(deadline) {
+			return nil, context.DeadlineExceeded
+		}
+		return metrics, err
+	})
+
+	promhttp.HandlerFor(gatherer, promhttp.HandlerOpts{}).ServeHTTP(w, r.WithContext(ctx))
 }
 
 func main() {
@@ -258,9 +309,11 @@ func main() {
 
 	logger.Info("Starting nut_exporter", "version", Version)
 
-	handler := &metricsHandler{
-		handlers: make(map[string]*http.Handler),
+	if *scrapeTimeout <= 0 {
+		logger.Error("Invalid scrape timeout - must be greater than zero", "timeout", *scrapeTimeout)
+		os.Exit(2)
 	}
+	handler := newMetricsHandler(collectorOpts, *scrapeTimeout)
 
 	http.Handle(*metricsPath, handler)
 	http.Handle(*exporterMetricsPath, promhttp.Handler())
