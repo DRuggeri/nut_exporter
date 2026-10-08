@@ -1,14 +1,20 @@
 package collectors
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	nut "github.com/robbiet480/go.nut"
+	nut "github.com/thegorangers/go.nut"
 )
+
+// DefaultScrapeTimeout bounds a collection when NutCollectorOpts carries no
+// context, so direct collector use cannot hang on an unresponsive server.
+var DefaultScrapeTimeout = 10 * time.Second
 
 var deviceLabels = []string{"model", "mfr", "serial", "type", "description", "contact", "location", "part", "macaddr"}
 
@@ -21,6 +27,11 @@ type NutCollector struct {
 }
 
 type NutCollectorOpts struct {
+	// Context bounds the whole collection: dialing, the VER/NETVER
+	// handshake, all I/O, and cleanup. When nil, DefaultScrapeTimeout
+	// applies. The context belongs to the connection; a cancelled context
+	// makes the scrape fail rather than return stale metrics.
+	Context           context.Context
 	Namespace         string
 	Server            string
 	ServerPort        int
@@ -32,6 +43,13 @@ type NutCollectorOpts struct {
 	OnRegex           string
 	OffRegex          string
 	DisableDeviceInfo bool
+}
+
+func (c *NutCollector) scrapeContext() (context.Context, context.CancelFunc) {
+	if c.opts.Context != nil {
+		return context.WithCancel(c.opts.Context)
+	}
+	return context.WithTimeout(context.Background(), DefaultScrapeTimeout)
 }
 
 func NewNutCollector(opts NutCollectorOpts, logger *slog.Logger) (*NutCollector, error) {
@@ -83,7 +101,9 @@ func NewNutCollector(opts NutCollectorOpts, logger *slog.Logger) (*NutCollector,
 
 func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 	c.logger.Debug("Connecting to server", "server", c.opts.Server, "port", c.opts.ServerPort)
-	client, err := nut.Connect(c.opts.Server, c.opts.ServerPort)
+	ctx, cancel := c.scrapeContext()
+	defer cancel()
+	client, err := nut.ConnectContext(ctx, c.opts.Server, c.opts.ServerPort)
 	if err != nil {
 		c.logger.Error("failed connecting to server", "err", err)
 		ch <- prometheus.NewInvalidMetric(
@@ -302,7 +322,9 @@ func (c *NutCollector) IsValidUPSName(upsName string) (bool, error) {
 	result := false
 
 	c.logger.Debug(fmt.Sprintf("Connecting to server and verifying `%s` is a valid UPS name", upsName), "server", c.opts.Server)
-	client, err := nut.Connect(c.opts.Server)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultScrapeTimeout)
+	defer cancel()
+	client, err := nut.ConnectContext(ctx, c.opts.Server, c.opts.ServerPort)
 	if err != nil {
 		c.logger.Error("error while connecting to server", "err", err)
 		return result, err

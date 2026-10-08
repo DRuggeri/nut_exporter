@@ -93,11 +93,15 @@ The exporter allows for per-scrape overrides of command line parameters by passi
 The following query string parameters can be passed to the `/ups_metrics` path:
   * `ups` - Required if more than one UPS is present in NUT
   * `server` - Overrides the command line parameter `--nut.server`
+  * `serverport` - Overrides the command line parameter `--nut.serverport`. Must be a TCP port between 1 and 65535; anything else is rejected with `400 Bad Request` before any connection is attempted
   * `username` - Overrides the command line parameter `--nut.username`
   * `password` - Overrides the environment variable NUT_EXPORTER_PASSWORD. It is **strongly** recommended to avoid passing credentials over http unless the exporter is configured with TLS
   * `variables` - Overrides the command line parameter `--nut.vars_enable`
   * `statuses` - Overrides the command line parameter `--nut.statuses`
 See the example scrape configurations below for how to utilize this capability
+
+### Scrape Budget
+Every scrape - dialing, the NUT handshake, all protocol I/O, and connection cleanup - is bounded by `--nut.scrape_timeout` (default `10s`, environment variable `NUT_EXPORTER_SCRAPE_TIMEOUT`). Keep the Prometheus `scrape_timeout` for this exporter strictly larger than this value so Prometheus, not a mid-flight cutoff, decides when a scrape has taken too long. A scrape that exceeds its budget, or whose client goes away, fails the HTTP request; it never returns a `200` carrying a partially gathered metric set.
 
 ### Example Prometheus Scrape Configurations
 Note that this exporter will scrape only one UPS per scrape invocation. If there are multiple UPS devices visible to NUT, you MUST ensure that you set up different scrape configs for each UPS device. Here is an example configuration for such a use case:
@@ -213,9 +217,11 @@ Flags:
       --nut.off_regex="^(disable|disabled|off|false|inactive|deactivated)$"  
                                  This regular expression will be used to determine if the var's value should be coaxed to 0 if it is a string. Match is case-insensitive. ($NUT_EXPORTER_OFF_REGEX)
                                  ($NUT_EXPORTER_OFF_REGEX)
-      --nut.statuses="OL,OB,LB,HB,RB,CHRG,DISCHRG,BYPASS,CAL,OFF,OVER,TRIM,BOOST,FSD,SD"  
+      --nut.statuses="OL,OB,LB,HB,RB,CHRG,DISCHRG,BYPASS,CAL,OFF,OVER,TRIM,BOOST,FSD,SD"
                                  A comma-separated list of statuses labels that will always be set by the exporter. If NUT does not set these flags, the exporter will force the
                                  network_ups_tools_ups_status{flag="NAME"} to 0. See the ups.status notes in README.' ($NUT_EXPORTER_STATUSES) ($NUT_EXPORTER_STATUSES)
+      --nut.scrape_timeout=10s
+                                 Overall budget for a single NUT scrape, covering dialing, the handshake, all I/O, and cleanup. Keep the Prometheus scrape_timeout larger than this value. ($NUT_EXPORTER_SCRAPE_TIMEOUT)
       --metrics.namespace="network_ups_tools"  
                                  Metrics Namespace ($NUT_EXPORTER_METRICS_NAMESPACE) ($NUT_EXPORTER_METRICS_NAMESPACE)
       --[no-]web.systemd-socket  Use systemd socket activation listeners instead of port listeners (Linux only).
