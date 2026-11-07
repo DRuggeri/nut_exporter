@@ -230,7 +230,9 @@ func main() {
 	if *printMetrics {
 		/* Make a channel and function to send output along */
 		var out chan *prometheus.Desc
+		done := make(chan struct{})
 		eatOutput := func(in <-chan *prometheus.Desc) {
+			defer close(done)
 			for desc := range in {
 				/* Weaksauce... no direct access to the variables */
 				//Desc{fqName: "the_name", help: "help text", constLabels: {}, variableLabels: []}
@@ -252,6 +254,8 @@ func main() {
 		go eatOutput(out)
 		nutCollector.Describe(out)
 		close(out)
+		/* Wait for the last item to be printed before exiting */
+		<-done
 
 		os.Exit(0)
 	}
