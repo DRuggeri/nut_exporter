@@ -43,6 +43,10 @@ var (
 		"nut.vars_enable", "A comma-separated list of variable names to monitor. See the variable notes in README. ($NUT_EXPORTER_VARIABLES)",
 	).Envar("NUT_EXPORTER_VARIABLES").Default("battery.charge,battery.voltage,battery.voltage.nominal,input.voltage,input.voltage.nominal,ups.load,ups.status").String()
 
+	infoFilter = kingpin.Flag(
+		"nut.info_vars", "A comma-separated list of variable names to export as labels of the variable_info metric, typically string variables such as battery.mfr.date or ups.firmware. See the variable notes in README. ($NUT_EXPORTER_INFO_VARIABLES)",
+	).Envar("NUT_EXPORTER_INFO_VARIABLES").Default("").String()
+
 	onRegex = kingpin.Flag(
 		"nut.on_regex", "This regular expression will be used to determine if the var's value should be coaxed to 1 if it is a string. Match is case-insensitive. ($NUT_EXPORTER_ON_REGEX)",
 	).Envar("NUT_EXPORTER_ON_REGEX").Default("^(enable|enabled|on|true|active|activated)$").String()
@@ -117,6 +121,10 @@ func (h *metricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if r.URL.Query().Get("variables") != "" {
 		thisCollectorOpts.Variables = strings.Split(r.URL.Query().Get("variables"), ",")
+	}
+
+	if r.URL.Query().Get("info_variables") != "" {
+		thisCollectorOpts.InfoVariables = strings.Split(r.URL.Query().Get("info_variables"), ",")
 	}
 
 	if r.URL.Query().Get("statuses") != "" {
@@ -204,6 +212,15 @@ func main() {
 		logger.Warn("Exporter has been started without `ups.status` variable to be exported with --nut.vars_enable. Online/offline/etc statuses will not be reported!")
 	}
 
+	infoVariables := []string{}
+	for _, varName := range strings.Split(*infoFilter, ",") {
+		variable := strings.Trim(varName, " ")
+		if variable == "" {
+			continue
+		}
+		infoVariables = append(infoVariables, variable)
+	}
+
 	statuses := []string{}
 	for _, status := range strings.Split(*statusList, ",") {
 		// Be nice and clear spaces for those that like them
@@ -222,6 +239,7 @@ func main() {
 		Password:          nutPassword,
 		DisableDeviceInfo: *disableDeviceInfo,
 		Variables:         variables,
+		InfoVariables:     infoVariables,
 		Statuses:          statuses,
 		OnRegex:           *onRegex,
 		OffRegex:          *offRegex,

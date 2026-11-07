@@ -16,6 +16,7 @@ The variables exposed to a NUT client by the NUT system are the lifeblood of a d
  * This exporter will always export the device.* metrics as labels, except for uptime, with a constant value of 1
  * Setting the `nut.vars_enable` parameter to an empty string will cause all numeric variables to be exported
  * NUT may return strings as values for some variables. Prometheus supports only float values, so the `on_regex` and `off_regex` parameters can be used to convert these to 0 or 1 in some cases
+ * Variables listed in the `nut.info_vars` parameter are exported as labels of `network_ups_tools_variable_info` with a constant value of 1, whatever their type. Example: `battery.mfr.date` is set as `network_ups_tools_variable_info{variable="battery.mfr.date",value="2026/11/06"} 1`. Each new value creates a new series, so list only variables that rarely change, such as `battery.mfr.date`, `ups.firmware`, `ups.test.result` or `input.transfer.reason`. This list is independent of `nut.vars_enable`
  * Not all driver and UPS implementations provide all variables. Run this exporter with log.level at debug or use the `LIST VAR` upsc command to see available variables for your UPS
  * All number-like values are coaxed to the appropriate go type by the library and are set as the value of the exported metric
  * Boolean values are coaxed to 0 (false) or 1 (true)
@@ -96,6 +97,7 @@ The following query string parameters can be passed to the `/ups_metrics` path:
   * `username` - Overrides the command line parameter `--nut.username`
   * `password` - Overrides the environment variable NUT_EXPORTER_PASSWORD. It is **strongly** recommended to avoid passing credentials over http unless the exporter is configured with TLS
   * `variables` - Overrides the command line parameter `--nut.vars_enable`
+  * `info_variables` - Overrides the command line parameter `--nut.info_vars`
   * `statuses` - Overrides the command line parameter `--nut.statuses`
 See the example scrape configurations below for how to utilize this capability
 
@@ -207,6 +209,8 @@ Flags:
                                  A flag to disable the generation of the device_info meta metric. ($NUT_EXPORTER_DISABLE_DEVICE_INFO) ($NUT_EXPORTER_DISABLE_DEVICE_INFO)
       --nut.vars_enable="battery.charge,battery.voltage,battery.voltage.nominal,input.voltage,input.voltage.nominal,ups.load,ups.status"  
                                  A comma-separated list of variable names to monitor. See the variable notes in README. ($NUT_EXPORTER_VARIABLES) ($NUT_EXPORTER_VARIABLES)
+      --nut.info_vars=""         A comma-separated list of variable names to export as labels of the variable_info metric, typically string variables such as battery.mfr.date or
+                                 ups.firmware. See the variable notes in README. ($NUT_EXPORTER_INFO_VARIABLES) ($NUT_EXPORTER_INFO_VARIABLES)
       --nut.on_regex="^(enable|enabled|on|true|active|activated)$"  
                                  This regular expression will be used to determine if the var's value should be coaxed to 1 if it is a string. Match is case-insensitive. ($NUT_EXPORTER_ON_REGEX)
                                  ($NUT_EXPORTER_ON_REGEX)
@@ -249,6 +253,7 @@ This collector is the workhorse of the exporter. Default metrics are exported fo
 
 ```
   network_ups_tools_device_info - UPS device information
+  network_ups_tools_variable_info - Variables of --nut.info_vars, with their value as a label
   network_ups_tools_VARIABLE_NAME - Variable from Network UPS Tools as noted in the variable notes above
 ```
 
