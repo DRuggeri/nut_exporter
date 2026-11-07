@@ -1,12 +1,15 @@
 package main
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/prometheus/client_golang/prometheus"
@@ -94,64 +97,114 @@ func init() {
 }
 
 type metricsHandler struct {
+	mu       sync.Mutex
 	handlers map[string]*http.Handler
 }
 
-func (h *metricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	thisCollectorOpts := collectorOpts
-	thisCollectorOpts.Ups = r.URL.Query().Get("ups")
+// splitList splits a comma-separated list, trimming spaces and skipping empty items. Be nice and
+// clear spaces for those that like them
+func splitList(list string) []string {
+	items := []string{}
+	for _, item := range strings.Split(list, ",") {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		items = append(items, item)
+	}
+	return items
+}
 
-	if r.URL.Query().Get("server") != "" {
-		thisCollectorOpts.Server = r.URL.Query().Get("server")
+// optsFromQuery applies the query string overrides to the command line options. An empty
+// parameter, an empty list or a port out of 1-65535 keeps the command line value
+func optsFromQuery(opts collectors.NutCollectorOpts, query url.Values) collectors.NutCollectorOpts {
+	opts.Ups = query.Get("ups")
+
+	if query.Get("server") != "" {
+		opts.Server = query.Get("server")
 	}
 
-	if r.URL.Query().Get("serverport") != "" {
-		if port, err := strconv.Atoi(r.URL.Query().Get("serverport")); err != nil {
-			thisCollectorOpts.ServerPort = port
+	if query.Get("serverport") != "" {
+		if port, err := strconv.Atoi(query.Get("serverport")); err == nil && port > 0 && port <= 65535 {
+			opts.ServerPort = port
 		}
 	}
 
-	if r.URL.Query().Get("username") != "" {
-		thisCollectorOpts.Username = r.URL.Query().Get("username")
+	if query.Get("username") != "" {
+		opts.Username = query.Get("username")
 	}
 
-	if r.URL.Query().Get("password") != "" {
-		thisCollectorOpts.Password = r.URL.Query().Get("password")
+	if query.Get("password") != "" {
+		opts.Password = query.Get("password")
 	}
 
-	if r.URL.Query().Get("variables") != "" {
-		thisCollectorOpts.Variables = strings.Split(r.URL.Query().Get("variables"), ",")
+	if list := splitList(query.Get("variables")); len(list) > 0 {
+		opts.Variables = list
 	}
 
-	if r.URL.Query().Get("info_variables") != "" {
-		thisCollectorOpts.InfoVariables = strings.Split(r.URL.Query().Get("info_variables"), ",")
+	if list := splitList(query.Get("info_variables")); len(list) > 0 {
+		opts.InfoVariables = list
 	}
 
-	if r.URL.Query().Get("statuses") != "" {
-		thisCollectorOpts.Statuses = strings.Split(r.URL.Query().Get("statuses"), ",")
+	if list := splitList(query.Get("statuses")); len(list) > 0 {
+		opts.Statuses = list
 	}
 
-	var promHandler http.Handler
-	cacheName := fmt.Sprintf("%s:%d/%s", thisCollectorOpts.Server, thisCollectorOpts.ServerPort, thisCollectorOpts.Ups)
-	if tmp, ok := h.handlers[cacheName]; ok {
+	return opts
+}
+
+// cacheKey identifies a handler by every option a request can override, so that requests with
+// different options do not share a collector. Fields are quoted so that no value can collide with
+// another, and the password is hashed so that the key does not hold it in clear
+func cacheKey(opts collectors.NutCollectorOpts) string {
+	return fmt.Sprintf("%q %d %q %q %x %q %q %q", opts.Server, opts.ServerPort, opts.Ups,
+		opts.Username, sha256.Sum256([]byte(opts.Password)), opts.Variables, opts.InfoVariables, opts.Statuses)
+}
+
+// getHandler returns the handler of these options, creating it on first use. The collector is
+// built without holding the lock: building it may connect to the NUT server, which must not
+// block the requests of the other handlers
+func (h *metricsHandler) getHandler(opts collectors.NutCollectorOpts) (http.Handler, error) {
+	cacheName := fmt.Sprintf("%s:%d/%s", opts.Server, opts.ServerPort, opts.Ups)
+	key := cacheKey(opts)
+
+	h.mu.Lock()
+	tmp, ok := h.handlers[key]
+	h.mu.Unlock()
+	if ok {
 		logger.Debug(fmt.Sprintf("Using existing handler for UPS `%s`", cacheName))
-		promHandler = *tmp
-	} else {
-		//Build a custom registry to include only the UPS metrics on the UPS metrics path
-		logger.Info(fmt.Sprintf("Creating new registry, handler, and collector for UPS `%s`", cacheName))
-		registry := prometheus.NewRegistry()
-		promHandler = promhttp.HandlerFor(registry, promhttp.HandlerOpts{Registry: registry})
-		promHandler = promhttp.InstrumentMetricHandler(registry, promHandler)
+		return *tmp, nil
+	}
 
-		nutCollector, err := collectors.NewNutCollector(thisCollectorOpts, logger)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte("500 - InternalServer Error"))
-			logger.Error("Internal server error", "err", err)
-			return
-		}
-		registry.MustRegister(nutCollector)
-		h.handlers[cacheName] = &promHandler
+	//Build a custom registry to include only the UPS metrics on the UPS metrics path
+	logger.Info(fmt.Sprintf("Creating new registry, handler, and collector for UPS `%s`", cacheName))
+	registry := prometheus.NewRegistry()
+	promHandler := promhttp.HandlerFor(registry, promhttp.HandlerOpts{Registry: registry})
+	promHandler = promhttp.InstrumentMetricHandler(registry, promHandler)
+
+	nutCollector, err := collectors.NewNutCollector(opts, logger)
+	if err != nil {
+		return nil, err
+	}
+	registry.MustRegister(nutCollector)
+
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	// Another request may have created it meanwhile: keep the first one
+	if tmp, ok := h.handlers[key]; ok {
+		return *tmp, nil
+	}
+	h.handlers[key] = &promHandler
+	return promHandler, nil
+}
+
+func (h *metricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	promHandler, err := h.getHandler(optsFromQuery(collectorOpts, r.URL.Query()))
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("500 - InternalServer Error"))
+		logger.Error("Internal server error", "err", err)
+		return
 	}
 
 	promHandler.ServeHTTP(w, r)
@@ -192,16 +245,9 @@ func main() {
 		}
 	}
 
-	variables := []string{}
+	variables := splitList(*enableFilter)
 	hasUpsStatusVariable := false
-	for _, varName := range strings.Split(*enableFilter, ",") {
-		// Be nice and clear spaces for those that like them
-		variable := strings.Trim(varName, " ")
-		if variable == "" {
-			continue
-		}
-		variables = append(variables, variable)
-
+	for _, variable := range variables {
 		// Special handling because this is an important and commonly needed variable
 		if variable == "ups.status" {
 			hasUpsStatusVariable = true
@@ -212,24 +258,8 @@ func main() {
 		logger.Warn("Exporter has been started without `ups.status` variable to be exported with --nut.vars_enable. Online/offline/etc statuses will not be reported!")
 	}
 
-	infoVariables := []string{}
-	for _, varName := range strings.Split(*infoFilter, ",") {
-		variable := strings.Trim(varName, " ")
-		if variable == "" {
-			continue
-		}
-		infoVariables = append(infoVariables, variable)
-	}
-
-	statuses := []string{}
-	for _, status := range strings.Split(*statusList, ",") {
-		// Be nice and clear spaces for those that like them
-		stat := strings.Trim(status, " ")
-		if stat == "" {
-			continue
-		}
-		statuses = append(statuses, strings.Trim(stat, " "))
-	}
+	infoVariables := splitList(*infoFilter)
+	statuses := splitList(*statusList)
 
 	collectorOpts = collectors.NutCollectorOpts{
 		Namespace:         *metricsNamespace,

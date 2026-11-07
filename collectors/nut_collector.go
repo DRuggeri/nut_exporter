@@ -318,7 +318,7 @@ func (c *NutCollector) IsValidUPSName(upsName string) (bool, error) {
 	result := false
 
 	c.logger.Debug(fmt.Sprintf("Connecting to server and verifying `%s` is a valid UPS name", upsName), "server", c.opts.Server)
-	client, err := nut.Connect(c.opts.Server)
+	client, err := nut.Connect(c.opts.Server, c.opts.ServerPort)
 	if err != nil {
 		c.logger.Error("error while connecting to server", "err", err)
 		return result, err

@@ -94,11 +94,15 @@ The exporter allows for per-scrape overrides of command line parameters by passi
 The following query string parameters can be passed to the `/ups_metrics` path:
   * `ups` - Required if more than one UPS is present in NUT
   * `server` - Overrides the command line parameter `--nut.server`
+  * `serverport` - Overrides the command line parameter `--nut.serverport`
   * `username` - Overrides the command line parameter `--nut.username`
   * `password` - Overrides the environment variable NUT_EXPORTER_PASSWORD. It is **strongly** recommended to avoid passing credentials over http unless the exporter is configured with TLS
   * `variables` - Overrides the command line parameter `--nut.vars_enable`
   * `info_variables` - Overrides the command line parameter `--nut.info_vars`
   * `statuses` - Overrides the command line parameter `--nut.statuses`
+
+An empty parameter, an empty list or a port out of 1-65535 keeps the command line value. Lists are comma-separated, spaces around items are ignored. Each distinct set of parameters creates a collector that is kept until the exporter restarts: do not expose the exporter to untrusted clients.
+
 See the example scrape configurations below for how to utilize this capability
 
 ### Example Prometheus Scrape Configurations
