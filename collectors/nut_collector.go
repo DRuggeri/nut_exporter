@@ -14,6 +14,7 @@ var deviceLabels = []string{"model", "mfr", "serial", "type", "description", "co
 
 type NutCollector struct {
 	deviceDesc *prometheus.Desc
+	infoDesc   *prometheus.Desc
 	logger     *slog.Logger
 	opts       *NutCollectorOpts
 	onRegex    *regexp.Regexp
@@ -28,6 +29,7 @@ type NutCollectorOpts struct {
 	Username          string
 	Password          string
 	Variables         []string
+	InfoVariables     []string
 	Statuses          []string
 	OnRegex           string
 	OffRegex          string
@@ -42,6 +44,11 @@ func NewNutCollector(opts NutCollectorOpts, logger *slog.Logger) (*NutCollector,
 	if opts.DisableDeviceInfo {
 		deviceDesc = nil
 	}
+
+	infoDesc := prometheus.NewDesc(prometheus.BuildFQName(opts.Namespace, "", "variable_info"),
+		"UPS variable value as a label, for the variables of --nut.info_vars",
+		[]string{"variable", "value"}, nil,
+	)
 
 	var onRegex, offRegex *regexp.Regexp
 	var err error
@@ -62,6 +69,7 @@ func NewNutCollector(opts NutCollectorOpts, logger *slog.Logger) (*NutCollector,
 
 	collector := &NutCollector{
 		deviceDesc: deviceDesc,
+		infoDesc:   infoDesc,
 		logger:     logger,
 		opts:       &opts,
 		onRegex:    onRegex,
@@ -188,6 +196,11 @@ func (c *NutCollector) Collect(ch chan<- prometheus.Metric) {
 				device[path[1]] = fmt.Sprintf("%v", variable.Value)
 			}
 
+			if sliceContains(c.opts.InfoVariables, variable.Name) {
+				c.logger.Debug("Collecting as info metric", "name", variable.Name)
+				ch <- prometheus.MustNewConstMetric(c.infoDesc, prometheus.GaugeValue, float64(1), variable.Name, fmt.Sprintf("%v", variable.Value))
+			}
+
 			/* Done special processing - now get as general as possible and gather all requested or number-like metrics */
 			if len(c.opts.Variables) == 0 || sliceContains(c.opts.Variables, variable.Name) {
 				c.logger.Debug("Export the variable? true")
@@ -287,6 +300,9 @@ func (c *NutCollector) Describe(ch chan<- *prometheus.Desc) {
 	if !c.opts.DisableDeviceInfo {
 		ch <- c.deviceDesc
 	}
+	if len(c.opts.InfoVariables) > 0 {
+		ch <- c.infoDesc
+	}
 }
 
 func sliceContains(c []string, value string) bool {
@@ -302,7 +318,7 @@ func (c *NutCollector) IsValidUPSName(upsName string) (bool, error) {
 	result := false
 
 	c.logger.Debug(fmt.Sprintf("Connecting to server and verifying `%s` is a valid UPS name", upsName), "server", c.opts.Server)
-	client, err := nut.Connect(c.opts.Server)
+	client, err := nut.Connect(c.opts.Server, c.opts.ServerPort)
 	if err != nil {
 		c.logger.Error("error while connecting to server", "err", err)
 		return result, err

@@ -15,4 +15,4 @@ go build -ldflags "-X main.Version=testing:$(git rev-list -1 HEAD)" -o "nut_expo
 echo "Running tests..."
 cd ../
 
-go test
+go test ./...
