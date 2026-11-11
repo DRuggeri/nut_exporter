@@ -13,8 +13,6 @@ jobs:
     name: Test
     strategy:
       matrix:
-        go-version:
-          - '1.23.x'
         os:
           - ubuntu-latest
           - macos-latest
@@ -22,13 +20,13 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Install Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
-
-      - name: Checkout code
-        uses: actions/checkout@v4
+          go-version-file: go.mod
 
       - name: Test
         run: go test ./...
@@ -48,7 +46,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version-file: go.mod
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v4
